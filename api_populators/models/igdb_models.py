@@ -150,3 +150,23 @@ class Game(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Websites(models.IntegerChoices):
+    OFFICIAL = 1, "Official"
+    WIKIA = 2, "Wikia"
+    WIKIPEDIA = 3, "Wikipedia"
+    FACEBOOK = 4, "Facebook"
+    TWITTER = 5, "Twitter"
+    TWITCH = 6, "Twitch"
+    INSTAGRAM = 8, "Instagram"
+    YOUTUBE = 9, "Youtube"
+    IPHONE = 10, "Iphone"
+    IPAD = 11, "Ipad"
+    ANDROID = 12, "Android"
+    STEAM = 13, "Steam"
+    REDDIT = 14, "Reddit"
+    ITCH = 15, "Itch"
+    EPICGAMES = 16, "Epicgames"
+    GOG = 17, "Gog"
+    DISCORD = 18, "Discord"

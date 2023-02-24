@@ -1,7 +1,7 @@
 import re
 import pathlib
 from os.path import exists
-from typing import Any
+from typing import Any, Union
 
 import requests
 from django.db import models
@@ -12,29 +12,32 @@ from .region_model import LocaleCover
 
 
 class ImageBase(CreatedUpdatedAt):
-    animated: bool = models.BooleanField(default=False)
-    height: int = models.PositiveIntegerField()
-    width: int = models.PositiveIntegerField()
-    filename: str = models.SlugField(unique=True, null=True, max_length=100)
+    animated: bool = models.BooleanField(blank=True, null=True)
+    height: int = models.PositiveIntegerField(blank=True, null=True)
+    width: int = models.PositiveIntegerField(blank=True, null=True)
+    filename: str = models.SlugField(null=True, blank=True, max_length=100)
     url: str = models.URLField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        if not self.url:
-            folder_name = f'{self.__class__.__name__.lower()}s'
-            self.url = f'http://127.0.0.1:8000/static/{folder_name}/{self.filename}.jpg'
+        if self.height and self.width:
+            self._get_image_from_url(url=self.url, filename=self.filename)
+        else:
+            self.filename = None
+        folder_name = f'{self.__class__.__name__.lower()}s'
+        self.url = f'http://127.0.0.1:8000/static/{folder_name}/{self.filename}.jpg'
         super(ImageBase, self).save(*args, **kwargs)
 
-    def get_image_from_url(self, url: str, filename: str):
+    def _get_image_from_url(self, url: Union[str, None], filename: str):
         pattern = r'(http|ftp|https)?:?//([\w_-]+(?:(?:.[\w_-]+)+)[\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])'
         reg_match = re.match(pattern, url)
-        schema = reg_match[1] or 'http://'
+        schema = f'{reg_match[1]}://' if reg_match[1] else 'http://'
         url_body = reg_match[2]
         class_name = self.__class__.__name__.lower()
-        self.filename = f'{class_name}-{filename}'
+        self.filename = f'{filename}'
         file_ext = pathlib.Path(url_body).suffix
         full_filename = self.filename+file_ext
 
-        full_root = settings.STATIC_ROOT.joinpath(f'{class_name}s')
+        full_root = pathlib.Path(settings.STATIC_ROOT).joinpath(f'{class_name}s')
         full_root.mkdir(parents=True, exist_ok=True)
         full_root = full_root.joinpath(full_filename)
 
@@ -50,7 +53,6 @@ class ImageBase(CreatedUpdatedAt):
                         break
 
                     handle.write(block)
-        return self
 
 
 class PlatformLogo(ImageBase):
@@ -63,3 +65,4 @@ class Cover(ImageBase):
 
 class Thumbnail(ImageBase):
     """ Thumbnail for each game """
+    game: Any = models.ForeignKey("api.Game", on_delete=models.CASCADE, related_name='thumbnails')

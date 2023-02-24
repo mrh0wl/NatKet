@@ -38,3 +38,12 @@ class LimitException(EndpointException):
             return 2
         else:
             return -1
+
+    def to_dict(self):
+        return self.__dict__
+
+
+class SlugException(EndpointException):
+    def __init__(self):
+        status_code, cause, message = (400, 'Game not found', 'Slug input not found in database')
+        super().__init__(status_code=status_code, cause=cause, message=message)

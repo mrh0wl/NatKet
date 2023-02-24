@@ -48,19 +48,18 @@ class Game(CreatedUpdatedAt):
         DELISTED = 'D', _('Delisted')
 
     title: str = models.CharField(max_length=100)
-    summary: str = models.CharField(max_length=1500, null=True, blank=True, default=None)
-    story_line: str = models.CharField(max_length=1500, null=True, blank=True, default=None)
-    cover: Any = models.OneToOneField(Cover, on_delete=models.CASCADE, null=True, blank=True)
-    # dlcs: Any = models.ForeignKey('self', on_delete=models.CASCADE, related_name='dlc')
-    # similar_games: Any = models.ForeignKey('self', on_delete=models.CASCADE, related_name='similar_game')
-    # expanded_games: Any = models.ForeignKey('self', on_delete=models.CASCADE, related_name='expanded_game')
-    # standalone_expansions: Any = models.ForeignKey('self', on_delete=models.CASCADE, related_name='standalone_expansion')
-    # expansions: Any = models.ForeignKey('self', on_delete=models.CASCADE, related_name='expansion')
-    # remakes: Any = models.ForeignKey('self', on_delete=models.CASCADE, related_name='remake')
-    # remasters: Any = models.ForeignKey('self', on_delete=models.CASCADE, related_name='remaster')
-    age_ratings: Any = models.ManyToManyField(AgeRating)
-    # game_modes: Any = models.ManyToManyField(GameModes)
-    # language_supports: Any = models.ManyToManyField(LanguageSupport)
+    summary: str = models.CharField(max_length=5000, null=True, blank=True, default=None)
+    story_line: str = models.CharField(max_length=5000, null=True, blank=True, default=None)
+    cover: Any = models.ForeignKey(Cover, related_name='cover', on_delete=models.CASCADE, null=True, blank=True)
+    dlcs: Any = models.ManyToManyField('self')
+    similar_games: Any = models.ManyToManyField('self')
+    expanded_games: Any = models.ManyToManyField('self')
+    standalone_expansions: Any = models.ManyToManyField('self')
+    expansions: Any = models.ManyToManyField('self')
+    remakes: Any = models.ManyToManyField('self')
+    remasters: Any = models.ManyToManyField('self')
+    age_ratings: Any = models.ManyToManyField(AgeRating, related_name='age_ratings')
+    game_modes: Any = models.ManyToManyField(GameModes, related_name='game_modes')
     release_dates: Any = models.ManyToManyField(ReleaseDate)
     genres: Any = models.ManyToManyField(Genre)
     keywords: Any = models.ManyToManyField(Keyword)
@@ -90,7 +89,7 @@ class Game(CreatedUpdatedAt):
     class Meta:
         verbose_name = 'Game'
         verbose_name_plural = 'Games'
-        ordering = ['-first_release']
+        ordering = ['title']
 
     def _create_tags(self):
         for field_name in ('genres', 'keywords', 'themes'):
@@ -112,3 +111,12 @@ class Game(CreatedUpdatedAt):
 
     def __str__(self):
         return str(self.title)
+
+
+# class DLC(Game):
+#     """ Model for DLCs """
+
+#     class Meta:
+#         verbose_name = 'DLC'
+#         verbose_name_plural = 'DLCs'
+#         ordering = ['-id']

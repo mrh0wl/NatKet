@@ -1,11 +1,8 @@
-import contextlib
 from urllib.request import urlopen
 
 from django.core.files import File
 from django.core.files.temp import NamedTemporaryFile
 from django.db import models
-
-from .creation_update_model import CreatedUpdatedAt
 
 
 def unique_slugify(instance, slug: str):

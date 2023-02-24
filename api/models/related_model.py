@@ -8,7 +8,7 @@ from .object_imagefield import unique_slugify
 
 
 class RelatedBase(CreatedUpdatedAt):
-    name: str = models.TextField(max_length=100)
+    name: str = models.TextField(max_length=200)
     slug: str = models.SlugField(unique=True)
     url: str = models.URLField(max_length=250)
 
@@ -35,17 +35,18 @@ class Theme(RelatedBase):
 
 
 class Multiplayer(CreatedUpdatedAt):
-    campaign_coop: bool = models.BooleanField()
-    drop_in: bool = models.BooleanField()
-    lan_coop: bool = models.BooleanField()
-    offline_coop: bool = models.BooleanField()
-    offline_coop_players: bool = models.BooleanField()
-    offline_players: int = models.PositiveIntegerField()
-    online_coop: bool = models.BooleanField()
-    online_coop_players: int = models.PositiveIntegerField()
-    online_players: int = models.PositiveIntegerField()
+    campaign_coop: bool = models.BooleanField(default=False)
+    drop_in: bool = models.BooleanField(default=False)
+    lan_coop: bool = models.BooleanField(default=False)
+    offline_coop: bool = models.BooleanField(default=False)
+    offline_coop_players: int = models.PositiveIntegerField(default=None, null=True, blank=True)
+    offline_players: int = models.PositiveIntegerField(default=None, null=True, blank=True)
+    online_coop: bool = models.BooleanField(default=False)
+    online_coop_players: int = models.PositiveIntegerField(default=None, null=True, blank=True)
+    online_players: int = models.PositiveIntegerField(default=None, null=True, blank=True)
     platform: Any = models.ForeignKey(Platform, on_delete=models.CASCADE)
-    splitscreen: bool = models.BooleanField()
+    splitscreen: bool = models.BooleanField(default=False)
+    splitscreen_online: bool = models.BooleanField(default=False)
 
 
 class PlayerPerspective(RelatedBase):
@@ -54,8 +55,8 @@ class PlayerPerspective(RelatedBase):
 
 class GameModes(RelatedBase):
     """ Game Modes of the game """
-    multiplayer: Any = models.ForeignKey(Multiplayer, on_delete=models.CASCADE)
-    player_perspective: Any = models.ManyToManyField(PlayerPerspective)
+    multiplayer: Any = models.ManyToManyField(Multiplayer)
+    player_perspectives: Any = models.ManyToManyField(PlayerPerspective)
 
 
 class Tag(CreatedUpdatedAt):

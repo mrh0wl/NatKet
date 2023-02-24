@@ -6,12 +6,12 @@ from .creation_update_model import CreatedUpdatedAt
 
 
 class GameVideo(CreatedUpdatedAt):
-    name: str = models.CharField(max_length=100)
-    game: Any = models.ForeignKey("api.Game", on_delete=models.CASCADE)
+    type: str = models.CharField(max_length=100)
+    game: Any = models.ForeignKey("api.Game", on_delete=models.CASCADE, related_name='videos')
     video_id: str = models.CharField(max_length=50)
 
     class Meta:
-        ordering = ['name']
+        ordering = ['type']
 
     def __str__(self):
-        return str(self.name)
+        return str(self.type)
