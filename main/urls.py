@@ -16,7 +16,6 @@ Including another URLconf
 
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib import admin
 from django.urls import path, include, re_path
 from django.shortcuts import redirect
 
@@ -25,7 +24,6 @@ urlpatterns = [
     path('', include('website.urls')),
     re_path(r'api/?(?:v1)?/?$', lambda request: redirect('/docs', permanent=True)),
     re_path(settings.API_V1_STR.replace('/', '', 1) + r'/.*/$', lambda request: redirect(f'{request.path_info[::-1].replace("/", "", 1)[::-1]}', permanent=True)),
-    path('admin/', admin.site.urls),
 ]
 
 """ patt: URLPattern = urlpatterns[1]
