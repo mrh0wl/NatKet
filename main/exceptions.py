@@ -16,9 +16,9 @@ class EndpointException(Exception):
 
 class LimitException(EndpointException):
     limit_errors = {
-        0: (400, 'Limit too low', 'Limit parameter should be a positive integer.'),
-        1: (400, 'Limit too low', 'Limit parameter should be greater than 0.'),
-        2: (403, 'Request limit too high', 'The maximum limit allowed is 20.'),
+        0: (400, 'Limit too low', 'Limit parameter should be a positive integer'),
+        1: (400, 'Limit too low', 'Limit parameter should be greater than zero'),
+        2: (403, 'Request limit too high', 'The maximum limit allowed is 20'),
     }
 
     def __init__(self, limit: int):
@@ -51,5 +51,5 @@ class OffsetException(EndpointException):
 
 class SlugException(EndpointException):
     def __init__(self):
-        status_code, cause, message = (400, 'Game not found', 'Slug input not found in database')
+        status_code, cause, message = (404, 'Game not found', 'Slug input not found in database')
         super().__init__(status_code=status_code, cause=cause, message=message)
