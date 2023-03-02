@@ -11,6 +11,8 @@ from .platform_model import Platform
 class ReleaseDate(models.Model):
     class Regions(models.TextChoices):
         EUROPE = 'EU', _('Europe')
+        ES = 'ES', _('Spanish')
+        LAT = 'LAT', _('Spanish (LATAM)')
         NORTH_AMERICA = 'NA', _('North America')
         AUSTRALIA = 'AU', _('Australia')
         NEW_ZEALAND = 'NZ', _('New Zealand')

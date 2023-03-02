@@ -1,103 +1,88 @@
-from typing import Any, List, Optional
+from typing import Any, Optional, List
 
 from fastapi import APIRouter
 
 from api.models import Game, Platform, Genre, AgeRating
 from api.schemas import GameOut, PlatformSchema, GenreSchema, ExceptionSchema, AgeRatingSchema
-from main.exceptions import LimitException, SlugException
+from main.exceptions import LimitException, SlugException, OffsetException
 
-exception_responses = {
-    400: {'model': ExceptionSchema},
-    403: {'model': ExceptionSchema},
-    422: {'model': ExceptionSchema}
-}
-
-game_router = APIRouter(responses=exception_responses)
-genre_router = APIRouter(responses=exception_responses)
-age_rating_router = APIRouter(responses=exception_responses)
-platform_router = APIRouter(responses=exception_responses)
+from utils.custom_str import String
 
 
-@game_router.get("/", response_model=List[GameOut], include_in_schema=False, response_model_exclude_none=True, response_model_exclude_unset=True)
-@game_router.get("", response_model=List[GameOut], response_model_exclude_none=True, response_model_exclude_unset=True)
-def get_games(offset: int = 0, limit: int = 10, filter: Optional[str] = None) -> Any:
-    """
-        Endpoint to get all games based on offset and limit values.
-    """
-    if limit < 1 or limit > 20:
-        raise LimitException(limit=limit)
-    game_selection = Game.objects.select_related('cover')
-    game_prefetch = game_selection.prefetch_related(
-        'age_ratings', 'tags', 'themes', 'keywords', 'genres', 'release_dates', 'age_ratings', 'dlcs', 'similar_games', 'remakes'
-    )
-    query = game_prefetch.all()[offset: offset + limit]
-    return GameOut.from_django(query, many=True)
+class BaseRouter(APIRouter):
+    exception_responses = {
+        400: {'model': ExceptionSchema},
+        403: {'model': ExceptionSchema},
+        # 422: {'model': ExceptionSchema}
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.redirect_slashes = True
+        self.responses = self.exception_responses
+
+        model_name: str = String(self.model.__name__).split_camelcase
+        description_root = kwargs.get(
+            'description_root') or f'Endpoint to get all __{model_name}s__ based on offset and limit values.'
+        description_slug = kwargs.get('description_slug') or f'Endpoint to get a specific __{model_name}__.'
+        # Add api route default
+        self.add_api_route(path="",
+                           endpoint=self.get_items,
+                           name=f'Get all {model_name}s',
+                           description=description_root,
+                           response_model=List[self.schema],
+                           response_model_exclude_none=True,
+                           methods=["GET"]
+                           )
+
+        # Add api route by slug
+        self.add_api_route(path=r"/{slug:str}",
+                           endpoint=self.get_item_by_slug,
+                           name=f'Get {model_name} by slug',
+                           description=description_slug,
+                           response_model=self.schema,
+                           response_model_exclude_none=True,
+                           methods=["GET"]
+                           )
+
+    def get_items(self, offset: int = 0, limit: int = 10, filter: Optional[str] = None) -> Any:
+        if limit < 1 or limit > 20:
+            raise LimitException(limit=limit)
+        if offset < 0:
+            raise OffsetException()
+
+        query = self.model.objects.all()[offset: offset + limit]
+        return self.schema.from_django(query, many=True)
+
+    def get_item_by_slug(self, slug: str) -> Any:
+        if self.model.objects.filter(slug=slug).exists():
+            query = self.model.objects.get(slug=slug)
+            return self.schema.from_django(query)
+        else:
+            raise SlugException()
 
 
-@game_router.get("/{slug:str}", response_model=GameOut, response_model_exclude_none=True, response_model_exclude_unset=True)
-def get_game(slug: str) -> Any:
-    """
-        Endpoint to get specific game
-    """
-    if Game.objects.filter(slug=slug).exists():
-        game_prefetch = Game.objects.prefetch_related(
-            'age_ratings', 'tags', 'themes', 'keywords', 'genres', 'release_dates', 'age_ratings', 'dlcs', 'similar_games', 'remakes')
-        query = game_prefetch.get(slug=slug)
-        return GameOut.from_django(query)
-
-    else:
-        raise SlugException()
+class GameRouter(BaseRouter):
+    model = Game
+    schema = GameOut
 
 
-@genre_router.get("/", response_model=List[GenreSchema], include_in_schema=False, response_model_exclude_none=True, response_model_exclude_unset=True)
-@genre_router.get("", response_model=List[GenreSchema], response_model_exclude_none=True, response_model_exclude_unset=True)
-def get_genres(offset: int = 0, limit: int = 10) -> Any:
-    """
-        Endpoint to get all the platforms based on offset and limit values.
-    """
-    if limit < 1 or limit > 20:
-        raise LimitException(limit=limit)
-    query = Genre.objects.all()[offset: offset + limit]
-    return GenreSchema.from_django(query, many=True)
+class GenreRouter(BaseRouter):
+    model = Genre
+    schema = GenreSchema
 
 
-@genre_router.get("/{slug:str}", response_model=GenreSchema, response_model_exclude_none=True, response_model_exclude_unset=True)
-def get_genre(slug: str) -> Any:
-    """
-        Endpoint to get all the platforms based on offset and limit values.
-    """
-    query = Genre.objects.get(slug=slug)
-    return GenreSchema.from_django(query)
+class PlatformRouter(BaseRouter):
+    model = Platform
+    schema = PlatformSchema
 
 
-@platform_router.get("/", response_model=List[PlatformSchema], include_in_schema=False, response_model_exclude_none=True, response_model_exclude_unset=True)
-@platform_router.get("", responses={}, response_model=List[PlatformSchema], response_model_exclude_none=True, response_model_exclude_unset=True)
-def get_platforms(offset: int = 0, limit: int = 10) -> Any:
-    """
-        Endpoint to get all the platforms based on offset and limit values.
-    """
-    if limit < 1 or limit > 20:
-        raise LimitException(limit=limit)
-    query = Platform.objects.all()[offset: offset + limit]
-    return PlatformSchema.from_django(query, many=True)
+class AgeRatingRouter(BaseRouter):
+    model = AgeRating
+    schema = AgeRatingSchema
 
 
-@platform_router.get("/{id:int}", response_model=PlatformSchema, response_model_exclude_none=True, response_model_exclude_unset=True)
-def get_platform(id: int) -> Any:
-    """
-        Endpoint to get all the platforms based on offset and limit values.
-    """
-    query = Platform.objects.get(id=id)
-    return PlatformSchema.from_django(query)
-
-
-@age_rating_router.get("/", response_model=List[AgeRatingSchema], include_in_schema=False, response_model_exclude_none=True, response_model_exclude_unset=True)
-@age_rating_router.get("", responses={}, response_model=List[AgeRatingSchema], response_model_exclude_none=True, response_model_exclude_unset=True)
-def get_age_ratings(offset: int = 0, limit: int = 10) -> Any:
-    """
-        Endpoint to get all the age ratings based on offset and limit values.
-    """
-    if limit < 1 or limit > 20:
-        raise LimitException(limit=limit)
-    query = AgeRating.objects.all()[offset: offset + limit]
-    return AgeRatingSchema.from_django(query, many=True)
+game_router = GameRouter()
+genre_router = GenreRouter()
+age_rating_router = AgeRatingRouter()
+platform_router = PlatformRouter()

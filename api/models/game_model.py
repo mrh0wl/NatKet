@@ -9,7 +9,6 @@ from api.models.creation_update_model import CreatedUpdatedAt
 
 from .age_rating_model import AgeRating
 from .image_model import Cover
-from .language_model import LanguageSupport
 from .object_imagefield import unique_slugify
 from .related_model import GameModes, Genre, Keyword, Tag, Theme
 from .release_date_model import ReleaseDate
@@ -50,7 +49,7 @@ class Game(CreatedUpdatedAt):
     title: str = models.CharField(max_length=100)
     summary: str = models.CharField(max_length=5000, null=True, blank=True, default=None)
     story_line: str = models.CharField(max_length=5000, null=True, blank=True, default=None)
-    cover: Any = models.ForeignKey(Cover, related_name='cover', on_delete=models.CASCADE, null=True, blank=True)
+    cover: Any = models.ForeignKey(Cover, on_delete=models.CASCADE, null=True, blank=True)
     dlcs: Any = models.ManyToManyField('self')
     similar_games: Any = models.ManyToManyField('self')
     expanded_games: Any = models.ManyToManyField('self')
@@ -58,8 +57,8 @@ class Game(CreatedUpdatedAt):
     expansions: Any = models.ManyToManyField('self')
     remakes: Any = models.ManyToManyField('self')
     remasters: Any = models.ManyToManyField('self')
-    age_ratings: Any = models.ManyToManyField(AgeRating, related_name='age_ratings')
-    game_modes: Any = models.ManyToManyField(GameModes, related_name='game_modes')
+    age_ratings: Any = models.ManyToManyField(AgeRating)
+    game_modes: Any = models.ManyToManyField(GameModes)
     release_dates: Any = models.ManyToManyField(ReleaseDate)
     genres: Any = models.ManyToManyField(Genre)
     keywords: Any = models.ManyToManyField(Keyword)

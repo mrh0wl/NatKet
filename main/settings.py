@@ -67,6 +67,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'main.urls'
+APPEND_SLASH = False
 
 TEMPLATES = [
     {
@@ -148,4 +149,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 API_V1_STR: str = "/api/v1"
 WSGI_APP_URL: str = "/"
-PROJECT_NAME = "Natket GameAPI"
+PROJECT_NAME = "NatKet Video Games Database API"
+PROJECT_VERSION = "1.0.0"
+PROJECT_DESCRIPTION = "One of the principles behind NatKet.com is accessibility of data. We wish to share the data with anyone who wants to build cool video game oriented websites, apps and services.\n\
+            \nThis means that you are not only contributing to the value of NatKet but to thousands of other projects as well. We are looking forward to see what exciting game related projects you come up with. Happy coding!\n\
+            \nFor a high level overview of our juicy data, check out the endpoints section."

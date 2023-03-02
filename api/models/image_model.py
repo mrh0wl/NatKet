@@ -8,11 +8,10 @@ from django.db import models
 from django.conf import settings
 
 from .creation_update_model import CreatedUpdatedAt
-from .region_model import LocaleCover
 
 
 class ImageBase(CreatedUpdatedAt):
-    animated: bool = models.BooleanField(blank=True, null=True)
+    animated: bool = models.BooleanField(default=False, null=True)
     height: int = models.PositiveIntegerField(blank=True, null=True)
     width: int = models.PositiveIntegerField(blank=True, null=True)
     filename: str = models.SlugField(null=True, blank=True, max_length=100)
@@ -31,7 +30,7 @@ class ImageBase(CreatedUpdatedAt):
         pattern = r'(http|ftp|https)?:?//([\w_-]+(?:(?:.[\w_-]+)+)[\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])'
         reg_match = re.match(pattern, url)
         schema = f'{reg_match[1]}://' if reg_match[1] else 'http://'
-        url_body = reg_match[2]
+        url_body = reg_match[2].replace('t_thumb', 't_cover_big')
         class_name = self.__class__.__name__.lower()
         self.filename = f'{filename}'
         file_ext = pathlib.Path(url_body).suffix
@@ -55,12 +54,12 @@ class ImageBase(CreatedUpdatedAt):
                     handle.write(block)
 
 
-class PlatformLogo(ImageBase):
-    alpha_channel = models.BooleanField(default=False)
+class LocaleCover(ImageBase):
+    """ Locale Cover for each alternative title"""
 
 
 class Cover(ImageBase):
-    locale_cover: Any = models.ManyToManyField(LocaleCover)
+    """ Cover for each game"""
 
 
 class Thumbnail(ImageBase):

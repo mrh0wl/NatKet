@@ -43,6 +43,12 @@ class LimitException(EndpointException):
         return self.__dict__
 
 
+class OffsetException(EndpointException):
+    def __init__(self):
+        status_code, cause, message = (400, 'Offset too low', 'Offset can\'t be lower than zero')
+        super().__init__(status_code=status_code, cause=cause, message=message)
+
+
 class SlugException(EndpointException):
     def __init__(self):
         status_code, cause, message = (400, 'Game not found', 'Slug input not found in database')

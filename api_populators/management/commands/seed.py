@@ -1,17 +1,19 @@
 import contextlib
 import time
+import json
 from concurrent import futures
 from typing import Any, Dict, List, Optional
+from langcodes import Language as Lang
 
 import requests
 from django.core.management.base import BaseCommand
 from django.utils.text import slugify
 
-from api.models import (AgeRating, AlternativeTitle, Collection, Cover, Game,
+from api.models import (AgeRating, Collection, Cover, Game,
                         GameModes, GameVideo, Genre, Keyword, Language,
-                        LanguageSupport, Links, Multiplayer, Platform,
-                        PlayerPerspective, ReleaseDate, SupportType, Theme,
-                        Thumbnail)
+                        LanguageSupport, Links, LocaleCover, Multiplayer,
+                        Platform, PlayerPerspective, ReleaseDate, SupportType, AlternativeTitle,
+                        Theme, Thumbnail)
 from api_populators.models import (Categories, PlatformType, Rating, RatingOrg,
                                    Regions, Status, Websites)
 from main import settings
@@ -39,6 +41,9 @@ def fetch_igdb_games(offset: int = 0, limit: int = 100, ids: Optional[List[int]]
         'tags',
         'category',
         'first_release_date',
+        'game_localizations.*',
+        'game_localizations.cover.*',
+        'game_localizations.region.*',
         'genres.*',
         'keywords.*',
         'themes.*',
@@ -72,7 +77,7 @@ def fetch_igdb_games(offset: int = 0, limit: int = 100, ids: Optional[List[int]]
     joined_fields = f'fields {",".join(fields)};'
     url = 'https://api.igdb.com/v4/games'
     where = 'where id = ' + ' | id = '.join([str(id) for id in ids]) + \
-        ';' if ids else 'sort first_release_date desc; where game_modes != null; '
+        ';' if ids else 'sort first_release_date desc; where game_localizations.cover != null & name ~ "Aokana"*;'
     response = requests.post(
         url,
         data=joined_fields+limit+f'offset {offset};{where}',
@@ -106,23 +111,23 @@ def _populate_executor(igdb_games, model: Optional[Game | Collection] = None, at
                 getattr(model, attr).add(igdb_game)
 
 
-def seed_model():
+def seed_model(json_data: Optional[List[Dict]] = None):
     """Function used to seed the database model"""
-    offset = 0
-    total_igdb_games = 100
-    igdb_games = []
+    igdb_games = json_data or []
 
-    with futures.ThreadPoolExecutor(max_workers=10) as executor:
-        future_to_offset = {executor.submit(fetch_igdb_games, offset, min(
-            total_igdb_games - offset, 500)): offset for offset in range(0, total_igdb_games, 500)}
-        for future in futures.as_completed(future_to_offset):
-            offset = future_to_offset[future]
-            try:
-                games = future.result()
-                igdb_games.extend(games)
-            except Exception as e:
-                print(
-                    f"Failed to fetch games starting from offset {offset}: {e}")
+    if not json_data:
+        offset = 0
+        total_igdb_games = 1
+        with futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_offset = {executor.submit(fetch_igdb_games, offset, min(
+                total_igdb_games - offset, 500)): offset for offset in range(0, total_igdb_games, 500)}
+            for future in futures.as_completed(future_to_offset):
+                offset = future_to_offset[future]
+                try:
+                    games = future.result()
+                    igdb_games.extend(games)
+                except Exception as e:
+                    print(f"Failed to fetch games starting from offset {offset}: {e}")
 
     _populate_executor(igdb_games)
 
@@ -139,7 +144,7 @@ def populate_game(game: Dict[str, Any]):
     try:
         game_type = Categories(int(game['category'])).label
     except Exception:
-        print(game['category'])
+        print(game)
         exit()
     game_title = game.get('name')
     game_summary = game.get('summary')
@@ -149,19 +154,18 @@ def populate_game(game: Dict[str, Any]):
     game_status = Status(int(game.get('status', 8))).label
     igdb_data, igdb_data_created = Game.objects.get_or_create(
         title=game_title,
+        cover=add_game_cover(game=game),
         defaults={
             'summary': game_summary,
             'story_line': game_story_line,
-            'cover': add_game_cover(game=game),
             'first_release': game_first_release,
             'type': Game.Type(game_type),
             'status': Game.Status(game_status),
         }
     )
-    if igdb_data_created:
-        _add_relations(game, igdb_data)
+    _add_relations(game, igdb_data)
 
-    time.sleep(10)
+    # time.sleep(10)
     return igdb_data
 
 
@@ -173,8 +177,9 @@ def _add_relations(game, igdb_data):
         igdb_data (Game): model of the game that should be relationated
     """
     print(f'Populating with {game.get("name")}')
-    add_alternative_names(igdb_data, alt_titles=game.get('alternative_names'))
-    add_collections(game.get('collection'))
+    # add_alternative_names(igdb_data, alt_titles=)
+    add_language_support(igdb_data, game)
+    """ add_collections(game.get('collection'))
     add_videos(igdb_data, game.get('videos'))
     add_links(igdb_data, game.get('videos'))
     add_game_related_data(igdb_data, game, Genre, "genres")
@@ -183,10 +188,9 @@ def _add_relations(game, igdb_data):
     add_age_ratings(igdb_data, game)
     add_release_dates(igdb_data, game)
     add_thumbnails(igdb_data, game.get('screenshots'))
-    add_language_support(igdb_data, game.get('language_supports'))
-    add_parsed_games(igdb_data, game)
+    add_parsed_games(igdb_data, game) """
 
-    # FIXME: Fix game_modes population
+    # TODO: Fix the game_modes population
     if not game.get('game_modes') and game.get('multiplayer_modes'):
         availables_modes = {
             'campaigncoop':  'Co-Operative',
@@ -213,31 +217,10 @@ def _add_relations(game, igdb_data):
                     else:
                         selected_modes.append(mode)
         for mode_name in selected_modes:
-            add_game_modes(game, mode_name)
+            add_game_modes(igdb_data, game, mode_name)
     else:
         for mode in game['game_modes']:
-            add_game_modes(game, mode.get('name'))
-
-
-def add_alternative_names(igdb_data: Game, alt_titles: Optional[List[Dict[str, Any]]]):
-    """Add alternative names to game model
-
-    Args:
-        igdb_data (Game): Game model
-        alt_titles (Optional[List[Dict[str, Any]]]): List of dictionaries that contains the alternative names
-    """
-    if not alt_titles:
-        return
-
-    for alt_title in alt_titles:
-        alt_title_obj, alt_title_created = AlternativeTitle.objects.get_or_create(
-            title=alt_title.get('name'),
-            defaults={'description': alt_title.get('comment')}
-        )
-        if alt_title_created:
-            alt_title_obj.save()
-
-        igdb_data.alternative_titles.add(alt_title_obj)
+            add_game_modes(igdb_data, game, mode.get('name'))
 
 
 def add_videos(igdb_data: Game, videos: Optional[List[Dict]]):
@@ -402,48 +385,127 @@ def add_game_modes(igdb_data: Game, game: Dict, mode_name: str):
     igdb_data.game_modes.add(mode_obj)
 
 
-def add_language_support(igdb_data: Game, language_supports: List[Dict[str, Any]]):
+def add_language_support(igdb_data: Game, game: Dict[str, Any]):
     """Add language supports to game model
 
     Args:
         igdb_data (Game): Game model to populate
-        language_supports (List[Dict[str, Any]]): List of dictionaries that contains the languages supported
+        language_supports (List[Dict[str, Any]]): List of dictionaries that contains the supported languages
     """
-    if not language_supports:
-        return
+    # TODO: add [] as default: game.get('key', [])
+    language_supports = game.get('language_supports', [])
+    alt_titles: List = game.get('alternative_names', [])
+    localizations = game.get('game_localizations', [])
 
+    all_names = [el.get('name').lower() for el in alt_titles]
+    all_locales = [el.get('language', {}).get('locale') for el in language_supports]
+
+    # TODO: if error getting language (Lang.find(language).language) -> create alternative_title
+    for localization in localizations:
+        try:
+            index = all_names.index(localization.get('name').lower())
+            alt_titles[index] = localization
+        except ValueError:
+            alt_titles.append(localization)
+
+    for alt_title in alt_titles:
+
+        if comment := alt_title.get('comment'):
+            language = comment.split()[0]
+        try:
+            # if language.capitalize() not in ['Spanish', 'English']:
+            lang_code = Lang.find(language).language
+
+            req = requests.get(f'https://restcountries.com/v3.1/lang/{language}')
+            res = req.json()
+            country_code = res[0]
+            code = f'{lang_code}-{country_code}'
+            try:
+                index = all_locales.index(alt_title.get('region', {}).get('identifier', code))
+                # print(language_supports[index])
+
+                language: Dict = language_supports[index].get('language')
+                language_obj, _ = Language.objects.get_or_create(
+                    locale=language.get('locale'),
+                    defaults={
+                        'name': language.get('name'),
+                        'native_name': language.get('native_name')
+                    }
+                )
+
+                support: Dict = language_supports.pop(index).get('language_support_type')
+                all_locales.pop(index)
+                support_obj, _ = SupportType.objects.get_or_create(
+                    name=support.get('name')
+                )
+
+                if alt_title.get('cover'):
+                    cover_obj, _ = LocaleCover.objects.get_or_create(
+                        filename=slugify(f'{igdb_data.title}-{language_obj.locale}'),
+                        defaults={
+                            'url': alt_title.get('cover').get('url'),
+                            'animated': alt_title.get('cover', {}).get('animated'),
+                            'height': alt_title.get('cover', {}).get('height'),
+                            'width': alt_title.get('cover', {}).get('width')
+                        }
+                    )
+            except ValueError:
+                language_obj = None
+                support_obj = None
+                cover_obj = None
+
+            lang_supports_obj, _ = LanguageSupport.objects.update_or_create(
+                game=igdb_data,
+                defaults={
+                    'title': alt_title.get('name'),
+                    'language': language_obj,
+                    'cover': cover_obj,
+                    'description': alt_title.get('comment')
+                }
+            )
+
+            lang_supports_obj.support_types.add(support_obj)
+        except Exception:
+            alt_title_obj = AlternativeTitle.objects.create(
+                title=alt_title.get('name'),
+                type=comment,
+                game=igdb_data
+            )
+            alt_title_obj.save()
+
+    # print(json.dumps(language_supports, indent=4))
     for language_support in language_supports:
         language: Dict = language_support.get('language')
-        language_obj, language_created = Language.objects.get_or_create(
+        language_obj, _ = Language.objects.update_or_create(
             locale=language.get('locale'),
-            name=language.get('name'),
-            native_name=language.get('native_name')
+            defaults={
+                'name': language.get('name'),
+                'native_name': language.get('native_name')
+            }
         )
 
-        if language_created:
-            language_obj.save()
-
         support: Dict = language_support.get('language_support_type')
-        support_obj, support_created = SupportType.objects.get_or_create(
+        support_obj, support_created = SupportType.objects.update_or_create(
             name=support.get('name')
         )
 
         if support_created:
             support_obj.save()
 
-        lang_supports_obj, lang_support_created = LanguageSupport.objects.get_or_create(
+        lang_supports_obj, _ = LanguageSupport.objects.get_or_create(
+            game=igdb_data,
             language=language_obj,
-            support_type=support_obj,
-            defaults={'game': igdb_data}
+            defaults={
+                'title': None,
+                'cover': None,
+                'description': None,
+            }
         )
 
-        if lang_support_created:
-            lang_supports_obj.save()
-
-        igdb_data.language_supports.add(lang_supports_obj)
+        lang_supports_obj.support_types.add(support_obj)
 
 
-def add_game_cover(game: dict) -> Cover:
+def add_game_cover(game: Dict) -> Cover:
     """Add game's cover to game model
 
     Args:
@@ -570,9 +632,12 @@ class Command(BaseCommand):
     Args:
         BaseCommand (Type): Parent of the class
     """
+
     def handle(self, *args, **options):
         """Function to handle the seed_model"""
         # clear_data()
-        seed_model()
+        with open('ex.json', encoding="utf8") as json_file:
+            data = json.load(json_file)
+            seed_model(data)
         # clear_data()
         print("IGDB API was successfully added")

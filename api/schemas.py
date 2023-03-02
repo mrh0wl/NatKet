@@ -2,32 +2,15 @@ from datetime import datetime
 from typing import List, Optional
 
 from djantic import ModelSchema
-from pydantic import Field, validator, BaseModel
+from pydantic import BaseModel, Field
 
-from api.models import Game, Genre, Keyword, ReleaseDate, Tag, Theme, Platform, Cover, AgeRating
-
-
-def confirm_title(value: str) -> str:
-    """
-    Validation to prevent empty title field.
-    Called by the helper function below;
-    """
-    if not value:
-        raise ValueError("Please provide a title.")
-    return value
-
-
-def confirm_slug(value: str) -> str:
-    """
-    Validation to prevent empty slug field.
-    Called by the helper function below;
-    """
-    if not value:
-        raise ValueError("Slug cannot be empty.")
-    return value
+from api.models import (AgeRating, Cover, Game, Genre, Keyword, Language,
+                        LanguageSupport, Platform, ReleaseDate, SupportType,
+                        Tag, Theme, AlternativeTitle)
 
 
 class AgeRatingSchema(ModelSchema):
+    id: int = Field(example=1)
     rating: str
     organization: AgeRating.Organizations
 
@@ -40,6 +23,7 @@ class ThemeSchema(ModelSchema):
     """
     Base fields for theme model
     """
+    id: int = Field(example=1)
 
     class Config:
         model = Theme
@@ -50,6 +34,7 @@ class GenreSchema(ModelSchema):
     """
     Base fields for genre model
     """
+    id: int = Field(example=1)
 
     class Config:
         model = Genre
@@ -60,7 +45,6 @@ class PlatformSchema(ModelSchema):
     """
     Base fields for platform model
     """
-
     id: int = Field(example=1)
 
     class Config:
@@ -72,7 +56,7 @@ class ReleaseDateSchema(ModelSchema):
     """
     Base fields for release date model
     """
-
+    id: int = Field(example=1)
     platform: PlatformSchema
 
     class Config:
@@ -84,6 +68,7 @@ class KeywordSchema(ModelSchema):
     """
     Base fields for keyword model
     """
+    id: int = Field(example=1)
 
     class Config:
         model = Keyword
@@ -94,6 +79,7 @@ class TagSchema(ModelSchema):
     """
     Base fields for tag model
     """
+    id: int = Field(example=1)
 
     class Config:
         model = Tag
@@ -101,10 +87,40 @@ class TagSchema(ModelSchema):
 
 
 class CoverSchema(ModelSchema):
+    id: int = Field(example=1)
+    animated: Optional[bool] = Field(example=False)
 
     class Config:
         model = Cover
-        exclude = ['imagebase_ptr']
+        exclude = ['imagebase_ptr', 'game_set']
+
+
+class LanguageSchema(ModelSchema):
+    class Config:
+        model = Language
+        exclude = ['languagesupport_set']
+
+
+class SupportTypeSchema(ModelSchema):
+    class Config:
+        model = SupportType
+        exclude = ['languagesupport_set']
+
+
+class AlternativeTitleSchema(ModelSchema):
+    class Config:
+        model = AlternativeTitle
+
+
+class LanguageSupportSchema(ModelSchema):
+    id: int = Field(example=1)
+    cover: Optional[CoverSchema]
+    support_types: Optional[List[SupportTypeSchema]]
+    language: Optional[LanguageSchema]
+
+    class Config:
+        model = LanguageSupport
+        exclude = ['game']
 
 
 AgeRatings = List[AgeRatingSchema]
@@ -113,19 +129,22 @@ Genres = List[GenreSchema]
 Themes = List[ThemeSchema]
 Tags = List[TagSchema]
 ReleaseDates = List[ReleaseDateSchema]
+LanguageSupports = List[LanguageSupportSchema]
+AlternativeTitles = List[AlternativeTitleSchema]
 
 
 class GameBase(ModelSchema):
     """
     Base fields for game model.
     """
-    title: str = Field(example="Sunshine Shuffle")
-    slug: str = Field(example="sunshine-shuffle")
-    created_at: datetime = Field(example="2023-02-15T21:02:36.241651+00:00")
-    updated_at: datetime = Field(example="2023-02-15T21:02:36.272645+00:00")
-    first_release: Optional[datetime] = Field(default=None, example="2020-05-12 18:00:00")
-    type: Game.Type = Field(example="MG")
-    _confirm_title = validator("title", allow_reuse=True)(confirm_title)
+    id: int = Field(example=1)
+    alternative_titles: AlternativeTitles
+    title: str
+    slug: str
+    created_at: datetime
+    updated_at: datetime
+    first_release: Optional[datetime]
+    type: Game.Type
 
     class Config:
         model = Game
@@ -154,6 +173,7 @@ class GameOut(GameBase):
     Response for api game.
     """
     age_ratings: Optional[AgeRatings]
+    language_supports: Optional[LanguageSupports]
     cover: CoverSchema
     genres: Genres
     themes: Themes

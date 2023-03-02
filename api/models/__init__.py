@@ -1,16 +1,16 @@
 from django.db import models
 
 from .age_rating_model import AgeRating
-from .alternative_title_model import AlternativeTitle
 from .collection_model import Collection
 from .game_model import Game
 from .game_video_model import GameVideo
-from .image_model import Cover, PlatformLogo, Thumbnail
+from .image_model import Cover, Thumbnail, LocaleCover
+from .alternative_titles import AlternativeTitle
 from .language_model import Language, LanguageSupport, SupportType
 from .links_model import Links
 from .object_imagefield import ObjectWithImageField
 from .platform_model import Platform
-from .region_model import LocaleCover, Region
+from .region_model import Region
 from .related_model import (GameModes, Genre, Keyword, Multiplayer,
                             PlayerPerspective, Tag, Theme)
 from .release_date_model import ReleaseDate
