@@ -13,6 +13,7 @@ class BaseRouter(APIRouter):
     exception_responses = {
         400: {'model': ExceptionSchema},
         403: {'model': ExceptionSchema},
+        404: {'model': ExceptionSchema},
         # 422: {'model': ExceptionSchema}
     }
 
@@ -32,7 +33,7 @@ class BaseRouter(APIRouter):
                            description=description_root,
                            response_model=List[self.schema],
                            response_model_exclude_none=True,
-                           methods=["GET"]
+                           methods=["GET"],
                            )
 
         # Add api route by slug
