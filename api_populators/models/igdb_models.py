@@ -152,7 +152,7 @@ class Game(models.Model):
         return self.name
 
 
-class Websites(models.IntegerChoices):
+class Link(models.IntegerChoices):
     OFFICIAL = 1, "Official"
     WIKIA = 2, "Wikia"
     WIKIPEDIA = 3, "Wikipedia"

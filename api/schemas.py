@@ -4,9 +4,10 @@ from typing import List, Optional
 from djantic import ModelSchema
 from pydantic import BaseModel, Field
 
-from api.models import (AgeRating, Cover, Game, Genre, Keyword, Language,
-                        LanguageSupport, Platform, ReleaseDate, SupportType,
-                        Tag, Theme, AlternativeTitle)
+from api.models import (AgeRating, AlternativeTitle, Cover, Game, GameMode,
+                        GameVideo, Genre, Keyword, Language, LanguageSupport,
+                        Multiplayer, Platform, PlayerPerspective,
+                        ReleasePlatform, SupportType, Tag, Theme, Thumbnail)
 
 
 class AgeRatingSchema(ModelSchema):
@@ -41,6 +42,23 @@ class GenreSchema(ModelSchema):
         exclude = ['game_set']
 
 
+class GameModeSchema(ModelSchema):
+    class Config:
+        model = GameMode
+
+
+class PlayerPerspectiveSchema(ModelSchema):
+    class Config:
+        model = PlayerPerspective
+        exclude = ['game_set']
+
+
+class MultiplayerModeSchema(ModelSchema):
+    class Config:
+        model = Multiplayer
+        exclude = ['releaseplatform_set']
+
+
 class PlatformSchema(ModelSchema):
     """
     Base fields for platform model
@@ -49,19 +67,20 @@ class PlatformSchema(ModelSchema):
 
     class Config:
         model = Platform
-        exclude = ['releasedate_set', 'multiplayer_set']
+        exclude = ['releaseplatform_set']
 
 
-class ReleaseDateSchema(ModelSchema):
+class ReleasePlatformSchema(ModelSchema):
     """
     Base fields for release date model
     """
     id: int = Field(example=1)
     platform: PlatformSchema
+    multiplayer_modes: Optional[MultiplayerModeSchema]
 
     class Config:
-        model = ReleaseDate
-        exclude = ['game_set']
+        model = ReleasePlatform
+        exclude = ['game']
 
 
 class KeywordSchema(ModelSchema):
@@ -95,6 +114,15 @@ class CoverSchema(ModelSchema):
         exclude = ['imagebase_ptr', 'game_set']
 
 
+class ThumbnailSchema(ModelSchema):
+    id: int = Field(example=1)
+    animated: Optional[bool] = Field(example=False)
+
+    class Config:
+        model = Thumbnail
+        exclude = ['imagebase_ptr', 'game_set']
+
+
 class LanguageSchema(ModelSchema):
     class Config:
         model = Language
@@ -123,14 +151,25 @@ class LanguageSupportSchema(ModelSchema):
         exclude = ['game']
 
 
+class VideoSchema(ModelSchema):
+    id: int = Field(example=1)
+
+    class Config:
+        model = GameVideo
+
+
 AgeRatings = List[AgeRatingSchema]
 Keywords = List[KeywordSchema]
 Genres = List[GenreSchema]
 Themes = List[ThemeSchema]
 Tags = List[TagSchema]
-ReleaseDates = List[ReleaseDateSchema]
+ReleasePlatforms = List[ReleasePlatformSchema]
 LanguageSupports = List[LanguageSupportSchema]
 AlternativeTitles = List[AlternativeTitleSchema]
+PlayerPerspectives = List[PlayerPerspectiveSchema]
+Videos = List[VideoSchema]
+GameModesList = List[GameModeSchema]
+Thumbnails = List[ThumbnailSchema]
 
 
 class GameBase(ModelSchema):
@@ -138,6 +177,8 @@ class GameBase(ModelSchema):
     Base fields for game model.
     """
     id: int = Field(example=1)
+    player_perspectives: Optional[PlayerPerspectives]
+    thumbnails: Thumbnails
     alternative_titles: AlternativeTitles
     title: str
     slug: str
@@ -145,6 +186,7 @@ class GameBase(ModelSchema):
     updated_at: datetime
     first_release: Optional[datetime]
     type: Game.Type
+    videos: Videos
 
     class Config:
         model = Game
@@ -174,12 +216,13 @@ class GameOut(GameBase):
     """
     age_ratings: Optional[AgeRatings]
     language_supports: Optional[LanguageSupports]
-    cover: CoverSchema
+    cover: Optional[CoverSchema]
     genres: Genres
     themes: Themes
     keywords: Keywords
+    game_modes: GameModesList
     tags: Tags
-    release_dates: ReleaseDates
+    release_platforms: ReleasePlatforms
     dlcs: Optional[Games]
     similar_games: Optional[Games]
     expanded_games: Optional[Games]

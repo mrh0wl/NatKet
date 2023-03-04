@@ -1,9 +1,7 @@
-from typing import Any
-
 from django.db import models
+from django.utils.text import slugify
 
 from .creation_update_model import CreatedUpdatedAt
-from .platform_model import Platform
 from .object_imagefield import unique_slugify
 
 
@@ -17,7 +15,7 @@ class RelatedBase(CreatedUpdatedAt):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = unique_slugify(self, self.slug)
+            self.slug = f'{slugify(self.name)}{unique_slugify(self, self.slug)}'
 
         super(RelatedBase, self).save(*args, **kwargs)
 
@@ -44,19 +42,21 @@ class Multiplayer(CreatedUpdatedAt):
     online_coop: bool = models.BooleanField(default=False)
     online_coop_players: int = models.PositiveIntegerField(default=None, null=True, blank=True)
     online_players: int = models.PositiveIntegerField(default=None, null=True, blank=True)
-    platform: Any = models.ForeignKey(Platform, on_delete=models.CASCADE)
     splitscreen: bool = models.BooleanField(default=False)
     splitscreen_online: bool = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.splitscreen_online:
+            self.splitscreen_online = False
+        super(Multiplayer, self).save(*args, **kwargs)
 
 
 class PlayerPerspective(RelatedBase):
     """ Perspective interaction that the player has"""
 
 
-class GameModes(RelatedBase):
+class GameMode(RelatedBase):
     """ Game Modes of the game """
-    multiplayer: Any = models.ManyToManyField(Multiplayer)
-    player_perspectives: Any = models.ManyToManyField(PlayerPerspective)
 
 
 class Tag(CreatedUpdatedAt):

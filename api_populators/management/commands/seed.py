@@ -1,21 +1,23 @@
 import contextlib
-import time
 import json
+import time
 from concurrent import futures
 from typing import Any, Dict, List, Optional
-from langcodes import Language as Lang
 
 import requests
+from difflib import SequenceMatcher
 from django.core.management.base import BaseCommand
 from django.utils.text import slugify
+from django.db.utils import OperationalError
+from langcodes import Language as Lang
 
-from api.models import (AgeRating, Collection, Cover, Game,
-                        GameModes, GameVideo, Genre, Keyword, Language,
-                        LanguageSupport, Links, LocaleCover, Multiplayer,
-                        Platform, PlayerPerspective, ReleaseDate, SupportType, AlternativeTitle,
+from api.models import (AgeRating, AlternativeTitle, Collection, Cover, Game,
+                        GameMode, GameVideo, Genre, Keyword, Language,
+                        LanguageSupport, Website, LocaleCover, Multiplayer,
+                        Platform, PlayerPerspective, ReleasePlatform, SupportType, LanguageTitles,
                         Theme, Thumbnail)
 from api_populators.models import (Categories, PlatformType, Rating, RatingOrg,
-                                   Regions, Status, Websites)
+                                   Regions, Status, Link)
 from main import settings
 
 
@@ -68,6 +70,8 @@ def fetch_igdb_games(offset: int = 0, limit: int = 100, ids: Optional[List[int]]
         'language_supports.language_support_type.*',
         'game_modes.*',
         'multiplayer_modes.*',
+        'multiplayer_modes.platform',
+        'player_perspectives.*'
         'status',
         'storyline',
         'summary',
@@ -77,7 +81,7 @@ def fetch_igdb_games(offset: int = 0, limit: int = 100, ids: Optional[List[int]]
     joined_fields = f'fields {",".join(fields)};'
     url = 'https://api.igdb.com/v4/games'
     where = 'where id = ' + ' | id = '.join([str(id) for id in ids]) + \
-        ';' if ids else 'sort first_release_date desc; where game_localizations.cover != null & name ~ "Aokana"*;'
+        ';' if ids else ''
     response = requests.post(
         url,
         data=joined_fields+limit+f'offset {offset};{where}',
@@ -106,7 +110,6 @@ def _populate_executor(igdb_games, model: Optional[Game | Collection] = None, at
         game_futures = [executor.submit(populate_game, game) for game in igdb_games]
         for future in futures.as_completed(game_futures):
             igdb_game: Game = future.result()
-            igdb_game.save()
             if model and attr:
                 getattr(model, attr).add(igdb_game)
 
@@ -117,7 +120,7 @@ def seed_model(json_data: Optional[List[Dict]] = None):
 
     if not json_data:
         offset = 0
-        total_igdb_games = 1
+        total_igdb_games = 100
         with futures.ThreadPoolExecutor(max_workers=10) as executor:
             future_to_offset = {executor.submit(fetch_igdb_games, offset, min(
                 total_igdb_games - offset, 500)): offset for offset in range(0, total_igdb_games, 500)}
@@ -152,20 +155,24 @@ def populate_game(game: Dict[str, Any]):
     game_first_release = str(game['first_release_date']
                              ) if 'first_release_date' in game else None
     game_status = Status(int(game.get('status', 8))).label
-    igdb_data, igdb_data_created = Game.objects.get_or_create(
-        title=game_title,
-        cover=add_game_cover(game=game),
-        defaults={
-            'summary': game_summary,
-            'story_line': game_story_line,
-            'first_release': game_first_release,
-            'type': Game.Type(game_type),
-            'status': Game.Status(game_status),
-        }
-    )
+    try:
+        igdb_data, _ = Game.objects.update_or_create(
+            title=game_title,
+            cover=add_game_cover(game=game),
+            defaults={
+                'summary': game_summary,
+                'story_line': game_story_line,
+                'first_release': game_first_release,
+                'type': Game.Type(game_type),
+                'status': Game.Status(game_status),
+            }
+        )
+    except OperationalError:
+        time.sleep(5)
+        return populate_game(game)
+
     _add_relations(game, igdb_data)
 
-    # time.sleep(10)
     return igdb_data
 
 
@@ -177,50 +184,119 @@ def _add_relations(game, igdb_data):
         igdb_data (Game): model of the game that should be relationated
     """
     print(f'Populating with {game.get("name")}')
-    # add_alternative_names(igdb_data, alt_titles=)
     add_language_support(igdb_data, game)
-    """ add_collections(game.get('collection'))
-    add_videos(igdb_data, game.get('videos'))
-    add_links(igdb_data, game.get('videos'))
-    add_game_related_data(igdb_data, game, Genre, "genres")
-    add_game_related_data(igdb_data, game, Keyword, "keywords")
-    add_game_related_data(igdb_data, game, Theme, "themes")
-    add_age_ratings(igdb_data, game)
-    add_release_dates(igdb_data, game)
-    add_thumbnails(igdb_data, game.get('screenshots'))
-    add_parsed_games(igdb_data, game) """
+    # add_collections(game.get('collection'))
+    # add_videos(igdb_data, game.get('videos'))
+    # add_websites(igdb_data, game.get('websites'))
+    # add_related_data(igdb_data, game, Genre, "genres")
+    # add_related_data(igdb_data, game, Keyword, "keywords")
+    # add_related_data(igdb_data, game, Theme, "themes")
+    # add_age_ratings(igdb_data, game)
+    # add_release_platforms(igdb_data, game)
+    # add_player_perspective(igdb_data, game.get('player_perspectives', []))
+    # add_thumbnails(igdb_data, game.get('screenshots'))
+    # add_parsed_games(igdb_data, game)
 
-    # TODO: Fix the game_modes population
-    if not game.get('game_modes') and game.get('multiplayer_modes'):
-        availables_modes = {
-            'campaigncoop':  'Co-Operative',
-            'dropin':  'Co-Operative',
-            'lancoop':  ['Co-Operative', 'Multiplayer'],
-            'offlinecoop':  ['Co-Operative', 'Single player'],
-            'onlinecoop':  ['Co-Operative', 'Multiplayer'],
-            'splitscreen':  'Split screen',
-            'splitscreenonline':  ['Split screen', 'Multiplayer']
-        }
-        selected_modes = []
-        if not any(
-            game['multiplayer_modes'].get(key) for key in availables_modes
-        ):
-            selected_modes.append('Single player')
-        else:
-            for key, mode in availables_modes.items():
-                if game['multiplayer_modes'].get(key) and mode not in selected_modes:
-                    in_selected = set(selected_modes)
-                    if isinstance(mode, list):
-                        in_mode = set(mode)
-                        duplicate_remover = in_mode - in_selected
-                        selected_modes.extend(duplicate_remover)
-                    else:
-                        selected_modes.append(mode)
-        for mode_name in selected_modes:
-            add_game_modes(igdb_data, game, mode_name)
-    else:
-        for mode in game['game_modes']:
-            add_game_modes(igdb_data, game, mode.get('name'))
+
+def add_release_platforms(igdb_data, game):
+    """Add release dates to game model
+
+    Args:
+        igdb_data (Game): Game model to populate
+        game (Dict[str, Any]): Dictionary of the game
+    """
+    multiplayer_modes = game.get('multiplayer_modes', [])
+    all_multiplayer_platforms = []
+
+    for mode in multiplayer_modes:
+        platform = mode.get('platform', {})
+        name = platform.get('name')
+        all_multiplayer_platforms.append(name)
+
+    for release_platform in game.get('release_dates', []):
+        platform = release_platform.get('platform', {})
+        abbreviation = platform.get('abbreviation')
+        alternative_name = platform.get('alternative_name')
+        name = platform.get('name')
+
+        platform_type = Platform.Type.UNDEFINED
+        if platform.get('category'):
+            platform_type = Platform.Type(PlatformType(int(platform['category'])).name)
+
+        defaults = {'abbreviation': abbreviation, 'alternative_name': alternative_name}
+        platform_obj, _ = Platform.objects.get_or_create(name=name, type=platform_type, defaults=defaults)
+
+        region_label = Regions(int(release_platform['region'])).label
+
+        valid_date = 'date' in release_platform
+        release_date = str(release_platform['date']) if valid_date else None
+
+        multiplayer_obj = add_multiplayer(all_multiplayer_platforms, platform_obj, multiplayer_modes)
+
+        ReleasePlatform.objects.get_or_create(
+            game=igdb_data,
+            region=region_label,
+            platform=platform_obj,
+            multiplayer_modes=multiplayer_obj,
+            defaults={'release_date': release_date}
+        )
+
+    multiplayer_keys = [element.keys() for element in multiplayer_modes]
+    selected_modes = select_game_modes(multiplayer_keys)
+    alternative_game_modes = {'name': mode for mode in selected_modes}
+    add_related_data(igdb_data, game, GameMode, 'game_modes')
+    add_related_data(igdb_data, alternative_game_modes, GameMode, 'game_modes')
+
+
+def select_game_modes(game_modes: List[str]) -> List[str]:
+    available_modes = {
+        'campaigncoop': ['Co-Operative'],
+        'dropin': ['Co-Operative'],
+        'lancoop': ['Co-Operative', 'Multiplayer'],
+        'offlinecoop': ['Co-Operative', 'Single player'],
+        'onlinecoop': ['Co-Operative', 'Multiplayer'],
+        'splitscreen': ['Split screen'],
+        'splitscreenonline': ['Split screen', 'Multiplayer']
+    }
+
+    selected_modes = set()
+    for mode, modes in available_modes.items():
+        if mode in game_modes:
+            selected_modes.update(modes)
+
+    return list(selected_modes)
+
+
+def add_multiplayer(all_multiplayer_platforms: List, platform_obj, multiplayer_modes: List):
+    try:
+        index = all_multiplayer_platforms.index(platform_obj.name)
+
+        multiplayer_mode = multiplayer_modes[index]
+        multiplayer_obj, _ = Multiplayer.objects.get_or_create(
+            campaign_coop=multiplayer_mode.get("campaigncoop"),
+            drop_in=multiplayer_mode.get("dropin"),
+            lan_coop=multiplayer_mode.get("lancoop"),
+            offline_coop=multiplayer_mode.get("offlinecoop"),
+            offline_coop_players=multiplayer_mode.get("offlinecoopmax"),
+            offline_players=multiplayer_mode.get("offlinemax"),
+            online_coop=multiplayer_mode.get("onlinecoop"),
+            online_coop_players=multiplayer_mode.get("onlinecoopmax"),
+            online_players=multiplayer_mode.get("onlinemax"),
+            splitscreen=multiplayer_mode.get("splitscreen"),
+            splitscreen_online=multiplayer_mode.get("splitscreenonline")
+        )
+    except ValueError:
+        multiplayer_obj = None
+
+    return multiplayer_obj
+
+
+def add_player_perspective(igdb_data: Game, player_perspectives: List):
+    for player_perspective in player_perspectives:
+        perspective_obj, _ = PlayerPerspective.objects.get_or_create(
+            name=player_perspective['name'],
+        )
+        igdb_data.player_perspectives.add(perspective_obj)
 
 
 def add_videos(igdb_data: Game, videos: Optional[List[Dict]]):
@@ -271,7 +347,7 @@ def add_thumbnails(igdb_data: Game, thumbnails: Optional[List[Dict]]):
             thumbnail_obj.save()
 
 
-def add_links(igdb_data: Game, links: Optional[List[Dict]]):
+def add_websites(igdb_data: Game, links: Optional[List[Dict]]):
     """Add website links to game model
 
     Args:
@@ -282,16 +358,13 @@ def add_links(igdb_data: Game, links: Optional[List[Dict]]):
         return
 
     for link in links:
-        link_category = Websites(int(link.get('category'))).label
-        link_obj, link_created = Links.objects.get_or_create(
-            category=link_category,
+        link_category = Link(int(link.get('category'))).label
+        link_obj, link_created = Website.objects.get_or_create(
+            category=Website.Link(link_category),
             game=igdb_data,
             trusted=link.get('trusted'),
             url=link.get('url')
         )
-
-        if link_created:
-            link_obj.save()
 
 
 def add_collections(collection: Optional[Dict[str, Any]]):
@@ -341,88 +414,71 @@ def add_parsed_games(igdb_data: Game, game: Dict[str, Any]):
         _populate_executor(data, igdb_data, 'remasters')
 
 
-def add_game_modes(igdb_data: Game, game: Dict, mode_name: str):
-    """Add game modes to game model
-
-    Args:
-        igdb_data (Game): Game model to populate
-        game (Dict): Dictionary of the game to extract the data
-        mode_name (str): Mode's name that should be added
-    """
-    mode_slug = slugify(mode_name)
-    with contextlib.suppress(Exception):
-        mode_obj, mode_created = GameModes.objects.get_or_create(
-            name=mode_name,
-            url=f'http://127.0.0.1:8000/game-modes/{mode_slug}',
-            defaults={'slug': mode_slug},
-        )
-    if mode_created:
-        if game.get('multiplayer_modes'):
-            multiplayer_obj, multiplayer_created = Multiplayer.objects.get_or_create(
-                campaign_coop=game['multiplayer_modes'].get('campaigncoop'),
-                drop_in=game['multiplayer_modes'].get('dropin'),
-                lan_coop=game['multiplayer_modes'].get('lancoop'),
-                offline_coop=game['multiplayer_modes'].get('offlinecoop'),
-                online_coop=game['multiplayer_modes'].get('onlinecoop'),
-                splitscreen=game['multiplayer_modes'].get('splitscreen'),
-                spliscreen_online=game['multiplayer_modes'].get('splitscreenonline')
-            )
-            if multiplayer_created:
-                multiplayer_obj.save()
-            mode_obj.multiplayer.add(multiplayer_obj)
-        if game.get('player_perspectives'):
-            pp_name = game['player_perspectives'].get('name')
-            pp_slug = slugify(pp_name)
-            pp_obj, pp_created = PlayerPerspective.objects.get_or_create(
-                name=pp_name,
-                url=f'http://127.0.0.1:8000/player-perspectives/{pp_slug}',
-                defaults={'slug': pp_slug}
-            )
-            if pp_created:
-                pp_obj.save()
-            mode_obj.player_perspectives.add(pp_obj)
-        mode_obj.save()
-    igdb_data.game_modes.add(mode_obj)
-
-
 def add_language_support(igdb_data: Game, game: Dict[str, Any]):
     """Add language supports to game model
 
     Args:
         igdb_data (Game): Game model to populate
-        language_supports (List[Dict[str, Any]]): List of dictionaries that contains the supported languages
+        game (Dict[str, Any]): Dictionary of the game
     """
-    # TODO: add [] as default: game.get('key', [])
     language_supports = game.get('language_supports', [])
     alt_titles: List = game.get('alternative_names', [])
     localizations = game.get('game_localizations', [])
 
     all_names = [el.get('name').lower() for el in alt_titles]
-    all_locales = [el.get('language', {}).get('locale') for el in language_supports]
+    all_locales = [el.get('language', {}).get('locale').strip() for el in language_supports]
 
-    # TODO: if error getting language (Lang.find(language).language) -> create alternative_title
     for localization in localizations:
-        try:
-            index = all_names.index(localization.get('name').lower())
-            alt_titles[index] = localization
-        except ValueError:
+        name = localization.get('name')
+        for i, alt_name in enumerate(all_names):
+            index, sim = (i, SequenceMatcher(None, alt_name.strip(), name.strip()).ratio())
+        if sim > 0.8:
+            alt_titles[index].update(localization)
+        else:
             alt_titles.append(localization)
 
+    for language_support in language_supports:
+        language: Dict = language_support.get('language')
+        lang_code = language.get('locale')
+
+        if language_objs := Language.objects.filter(locale=lang_code):
+            language_obj = language_objs[0]
+        else:
+            language_obj = Language.objects.create(
+                locale=lang_code,
+                name=language.get('name'),
+                native_name=language.get('native_name')
+            )
+
+        support: Dict = language_support.get('language_support_type')
+        support_name = support.get('name')
+        if support_objs := SupportType.objects.filter(name=support_name):
+            support_obj = support_objs[0]
+        else:
+            support_obj = SupportType.objects.create(name=support_name)
+
+        if lang_supports_objs := LanguageSupport.objects.filter(game=igdb_data, language=language_obj):
+            lang_supports_obj = lang_supports_objs[0]
+        else:
+            lang_supports_obj = LanguageSupport.objects.create(
+                game=igdb_data,
+                language=language_obj,
+                cover=None,
+            )
+
+        lang_supports_obj.support_types.add(support_obj)
+
     for alt_title in alt_titles:
-
-        if comment := alt_title.get('comment'):
-            language = comment.split()[0]
+        name = alt_title.get('name')
+        comment = alt_title.get('comment', 'Others')
+        identifier = alt_title.get('region', {}).get('identifier')
+        language = comment.split()[0]
+        if igdb_data.title.startswith('Overcooked'):
+            print(json.dumps(alt_title, indent=4, ensure_ascii=False))
         try:
-            # if language.capitalize() not in ['Spanish', 'English']:
             lang_code = Lang.find(language).language
-
-            req = requests.get(f'https://restcountries.com/v3.1/lang/{language}')
-            res = req.json()
-            country_code = res[0]
-            code = f'{lang_code}-{country_code}'
-            try:
-                index = all_locales.index(alt_title.get('region', {}).get('identifier', code))
-                # print(language_supports[index])
+            if identifier in all_locales:
+                index = all_locales.index(identifier)
 
                 language: Dict = language_supports[index].get('language')
                 language_obj, _ = Language.objects.get_or_create(
@@ -433,14 +489,14 @@ def add_language_support(igdb_data: Game, game: Dict[str, Any]):
                     }
                 )
 
-                support: Dict = language_supports.pop(index).get('language_support_type')
                 all_locales.pop(index)
+                support: Dict = language_supports.pop(index).get('language_support_type')
                 support_obj, _ = SupportType.objects.get_or_create(
                     name=support.get('name')
                 )
 
                 if alt_title.get('cover'):
-                    cover_obj, _ = LocaleCover.objects.get_or_create(
+                    cover_obj, _ = LocaleCover.objects.update_or_create(
                         filename=slugify(f'{igdb_data.title}-{language_obj.locale}'),
                         defaults={
                             'url': alt_title.get('cover').get('url'),
@@ -449,60 +505,31 @@ def add_language_support(igdb_data: Game, game: Dict[str, Any]):
                             'width': alt_title.get('cover', {}).get('width')
                         }
                     )
-            except ValueError:
-                language_obj = None
-                support_obj = None
+            else:
                 cover_obj = None
 
-            lang_supports_obj, _ = LanguageSupport.objects.update_or_create(
+            lang_supports_obj, _ = LanguageSupport.objects.get_or_create(
                 game=igdb_data,
+                language=language_obj,
                 defaults={
-                    'title': alt_title.get('name'),
-                    'language': language_obj,
                     'cover': cover_obj,
-                    'description': alt_title.get('comment')
+                    'support_types': support_obj
                 }
             )
 
             lang_supports_obj.support_types.add(support_obj)
-        except Exception:
-            alt_title_obj = AlternativeTitle.objects.create(
-                title=alt_title.get('name'),
-                type=comment,
+            LanguageTitles.objects.get_or_create(
+                language_support=lang_supports_obj,
+                title=name,
+                description=comment
+            )
+        except LookupError:
+            AlternativeTitle.objects.create(
+                title=name,
+                type=comment or 'Other',
                 game=igdb_data
             )
-            alt_title_obj.save()
-
     # print(json.dumps(language_supports, indent=4))
-    for language_support in language_supports:
-        language: Dict = language_support.get('language')
-        language_obj, _ = Language.objects.update_or_create(
-            locale=language.get('locale'),
-            defaults={
-                'name': language.get('name'),
-                'native_name': language.get('native_name')
-            }
-        )
-
-        support: Dict = language_support.get('language_support_type')
-        support_obj, support_created = SupportType.objects.update_or_create(
-            name=support.get('name')
-        )
-
-        if support_created:
-            support_obj.save()
-
-        lang_supports_obj, _ = LanguageSupport.objects.get_or_create(
-            game=igdb_data,
-            language=language_obj,
-            defaults={
-                'title': None,
-                'cover': None,
-                'description': None,
-            }
-        )
-
-        lang_supports_obj.support_types.add(support_obj)
 
 
 def add_game_cover(game: Dict) -> Cover:
@@ -526,40 +553,28 @@ def add_game_cover(game: Dict) -> Cover:
             }
         )
     else:
-        game_cover, game_cover_created = Cover.objects.get_or_create(
-            url=game.get('cover', {}).get('url', 'http://127.0.0.1:8000/static/covers/None.jpg'),
-            defaults={
-                'filename': slugify(game_title),
-                'animated': game.get('cover', {}).get('animated'),
-                'height': game.get('cover', {}).get('height'),
-                'width': game.get('cover', {}).get('width')
-            }
-        )
-    if game_cover_created:
-        game_cover.save()
+        game_cover = None
 
     return game_cover
 
 
-def add_game_related_data(igdb_data, game, related_model, related_data):
+def add_related_data(igdb_data, obj, related_model, related_data):
     """Add related data to game model
 
     Args:
-        igdb_data (Game): Game model to populate
-        game (Dict[str, Any]): Dictionary of the game
+        igdb_data (Model): Model to populate
+        obj (Dict[str, Any]): Dictionary of the object
         related_model (ModelType): ModelType related to Game model used to get or create the object
         related_data (str): Attribute that should be contained in Game model
     """
-    for related_object in game.get(related_data, []):
+    for related_object in obj.get(related_data, []):
         related_slug = slugify(related_object['name'])
         with contextlib.suppress(Exception):
-            related_obj, related_created = related_model.objects.get_or_create(
+            related_obj, _ = related_model.objects.get_or_create(
                 name=related_object['name'],
-                url=f'http://127.0.0.1:8000/{related_data}/{related_slug}',
+                url=f'http://127.0.0.1:8000/{related_data.replace("_", "-")}/{related_slug}',
                 defaults={'slug': related_slug},
             )
-        if related_created:
-            related_obj.save()
         getattr(igdb_data, related_data).add(related_obj)
 
 
@@ -581,49 +596,6 @@ def add_age_ratings(igdb_data, game):
             age_rating_obj.save()
 
         igdb_data.age_ratings.add(age_rating_obj)
-
-
-def add_release_dates(igdb_data, game):
-    """Add release dates to game model
-
-    Args:
-        igdb_data (Game): Game model to populate
-        game (Dict[str, Any]): Dictionary of the game
-    """
-    for release_date in game.get('release_dates', []):
-        platform = release_date['platform']
-        abbreviation = platform.get('abbreviation')
-        alternative_name = platform.get('alternative_name')
-        name = platform.get('name')
-
-        platform_type = Platform.Type.UNDEFINED
-        if 'category' in platform:
-            platform_type = Platform.Type(
-                PlatformType(int(platform['category'])).name
-            )
-        elif name.upper() in PlatformType.names:
-            platform_type = Platform.Type(name.upper())
-
-        platform_obj, platform_created = Platform.objects.get_or_create(
-            name=name,
-            abbreviation=abbreviation,
-            alternative_name=alternative_name,
-            type=platform_type
-        )
-        if platform_created:
-            platform_obj.save()
-        valid_date = 'date' in release_date
-        release_date_obj = ReleaseDate.objects.create(
-            date=str(release_date['date']) if valid_date else None,
-            region=ReleaseDate.Regions(
-                Regions(
-                    int(release_date['region'])
-                ).label
-            ),
-            platform=platform_obj
-        )
-        # release_date_obj.platform.add(platform_obj)
-        igdb_data.release_dates.add(release_date_obj)
 
 
 class Command(BaseCommand):

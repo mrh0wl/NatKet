@@ -41,9 +41,13 @@ class SupportType(CreatedUpdatedAt):
 
 
 class LanguageSupport(CreatedUpdatedAt):
-    title: str = models.CharField(max_length=100, null=True)
-    description: str = models.CharField(max_length=100, null=True)
     cover: Any = models.ForeignKey("api.LocaleCover", on_delete=models.CASCADE, null=True)
     game: Any = models.ForeignKey("api.Game", on_delete=models.CASCADE, related_name="language_supports")
     support_types: Any = models.ManyToManyField("api.SupportType")
     language: Any = models.ForeignKey("api.Language", on_delete=models.CASCADE, null=True)
+
+
+class LanguageTitles(CreatedUpdatedAt):
+    title: str = models.CharField(max_length=100, null=True)
+    description: str = models.CharField(max_length=100, null=True)
+    language_support: Any = models.ForeignKey("api.LanguageSupport", on_delete=models.CASCADE, related_name="language_titles")

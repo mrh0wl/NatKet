@@ -6,8 +6,8 @@ from django.utils.translation import gettext_lazy as _
 from .creation_update_model import CreatedUpdatedAt
 
 
-class Links(CreatedUpdatedAt):
-    class Websites(models.TextChoices):
+class Website(CreatedUpdatedAt):
+    class Link(models.TextChoices):
         OFFICIAL = "Official", _('Official Website')
         WIKIA = "Wikia", _('Fandom Wiki')
         WIKIPEDIA = "Wikipedia", 'Wikipedia'
@@ -26,7 +26,7 @@ class Links(CreatedUpdatedAt):
         GOG = "Gog", 'GoG'
         DISCORD = "Discord", _('Official Discord')
 
-    game: Any = models.ForeignKey('api.Game', on_delete=models.CASCADE, related_name='links')
-    category: int = models.IntegerField(choices=Websites.choices)
+    game: Any = models.ForeignKey('api.Game', on_delete=models.CASCADE, related_name='websites')
+    category: int = models.CharField(max_length=100, choices=Link.choices)
     trusted: bool = models.BooleanField(default=False)
     url: str = models.URLField(max_length=200)

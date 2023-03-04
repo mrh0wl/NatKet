@@ -1,19 +1,19 @@
 from django.db import models
 
 from .age_rating_model import AgeRating
+from .alternative_titles import AlternativeTitle
 from .collection_model import Collection
 from .game_model import Game
 from .game_video_model import GameVideo
-from .image_model import Cover, Thumbnail, LocaleCover
-from .alternative_titles import AlternativeTitle
-from .language_model import Language, LanguageSupport, SupportType
-from .links_model import Links
+from .image_model import Cover, LocaleCover, Thumbnail
+from .language_model import Language, LanguageSupport, SupportType, LanguageTitles
 from .object_imagefield import ObjectWithImageField
 from .platform_model import Platform
 from .region_model import Region
-from .related_model import (GameModes, Genre, Keyword, Multiplayer,
+from .related_model import (GameMode, Genre, Keyword, Multiplayer,
                             PlayerPerspective, Tag, Theme)
-from .release_date_model import ReleaseDate
+from .release_platform_model import ReleasePlatform
+from .website_model import Website
 
 
 class User(models.Model):

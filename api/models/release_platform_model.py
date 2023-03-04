@@ -1,14 +1,13 @@
 from datetime import datetime
+from typing import Any
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from api.fields import UCDateTimeField
 
-from .platform_model import Platform
 
-
-class ReleaseDate(models.Model):
+class ReleasePlatform(models.Model):
     class Regions(models.TextChoices):
         EUROPE = 'EU', _('Europe')
         ES = 'ES', _('Spanish')
@@ -23,17 +22,15 @@ class ReleaseDate(models.Model):
         KOREA = 'KR', _('Korea')
         BRAZIL = 'BR', _('Brazil')
 
-    platform: int = models.ForeignKey(
-        Platform,
-        on_delete=models.CASCADE,
-    )
-    date: datetime = UCDateTimeField(
+    game: Any = models.ForeignKey("api.Game", on_delete=models.CASCADE, related_name='release_platforms')
+    platform: int = models.ForeignKey('api.Platform', on_delete=models.CASCADE)
+    multiplayer_modes: Any = models.ForeignKey('api.Multiplayer', on_delete=models.CASCADE, null=True)
+    release_date: datetime = UCDateTimeField(
         auto_created=False,
         auto_now=False,
-        auto_now_add=False,
-        null=True
+        auto_now_add=False
     )
     region: str = models.CharField(
-        max_length=50,
+        max_length=3,
         choices=Regions.choices,
     )

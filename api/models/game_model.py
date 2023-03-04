@@ -10,8 +10,7 @@ from api.models.creation_update_model import CreatedUpdatedAt
 from .age_rating_model import AgeRating
 from .image_model import Cover
 from .object_imagefield import unique_slugify
-from .related_model import GameModes, Genre, Keyword, Tag, Theme
-from .release_date_model import ReleaseDate
+from .related_model import GameMode, Genre, Keyword, Tag, Theme
 
 
 class Game(CreatedUpdatedAt):
@@ -47,6 +46,7 @@ class Game(CreatedUpdatedAt):
         DELISTED = 'D', _('Delisted')
 
     title: str = models.CharField(max_length=100)
+    player_perspectives: Any = models.ManyToManyField('api.PlayerPerspective')
     summary: str = models.CharField(max_length=5000, null=True, blank=True, default=None)
     story_line: str = models.CharField(max_length=5000, null=True, blank=True, default=None)
     cover: Any = models.ForeignKey(Cover, on_delete=models.CASCADE, null=True, blank=True)
@@ -58,14 +58,13 @@ class Game(CreatedUpdatedAt):
     remakes: Any = models.ManyToManyField('self')
     remasters: Any = models.ManyToManyField('self')
     age_ratings: Any = models.ManyToManyField(AgeRating)
-    game_modes: Any = models.ManyToManyField(GameModes)
-    release_dates: Any = models.ManyToManyField(ReleaseDate)
+    game_modes: Any = models.ManyToManyField(GameMode)
     genres: Any = models.ManyToManyField(Genre)
     keywords: Any = models.ManyToManyField(Keyword)
     themes: Any = models.ManyToManyField(Theme)
     tags: Any = models.ManyToManyField(Tag)
     slug: str = models.SlugField(
-        unique=False,
+        unique=True,
         verbose_name=_("slug"),
         allow_unicode=True,
         max_length=255,
