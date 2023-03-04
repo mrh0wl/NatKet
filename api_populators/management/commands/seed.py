@@ -430,8 +430,7 @@ def add_language_support(igdb_data: Game, game: Dict[str, Any]):
 
     for localization in localizations:
         name = localization.get('name')
-        for i, alt_name in enumerate(all_names):
-            index, sim = (i, SequenceMatcher(None, alt_name.strip(), name.strip()).ratio())
+        index, sim = max(enumerate(SequenceMatcher(None, alt_name.strip(), name.strip()).ratio() for alt_name in all_names), key=lambda x: x[1])
         if sim > 0.8:
             alt_titles[index].update(localization)
         else:
@@ -473,26 +472,25 @@ def add_language_support(igdb_data: Game, game: Dict[str, Any]):
         comment = alt_title.get('comment', 'Others')
         identifier = alt_title.get('region', {}).get('identifier')
         language = comment.split()[0]
-        if igdb_data.title.startswith('Overcooked'):
-            print(json.dumps(alt_title, indent=4, ensure_ascii=False))
         try:
             lang_code = Lang.find(language).language
             if identifier in all_locales:
                 index = all_locales.index(identifier)
 
-                language: Dict = language_supports[index].get('language')
-                language_obj, _ = Language.objects.get_or_create(
-                    locale=language.get('locale'),
+                language_support = language_supports[index]
+                language_obj = language_support.get('language')
+                language_obj, created = Language.objects.get_or_create(
+                    locale=language_obj.get('locale'),
                     defaults={
-                        'name': language.get('name'),
-                        'native_name': language.get('native_name')
+                        'name': language_obj.get('name'),
+                        'native_name': language_obj.get('native_name')
                     }
                 )
 
-                all_locales.pop(index)
-                support: Dict = language_supports.pop(index).get('language_support_type')
-                support_obj, _ = SupportType.objects.get_or_create(
-                    name=support.get('name')
+                support = language_support.get('language_support_type')
+                support_name = support.get('name')
+                support_obj, created = SupportType.objects.get_or_create(
+                    name=support_name
                 )
 
                 if alt_title.get('cover'):
