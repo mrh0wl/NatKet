@@ -6,7 +6,7 @@ from .collection_model import Collection
 from .game_model import Game
 from .game_video_model import GameVideo
 from .image_model import Cover, LocaleCover, Thumbnail
-from .language_model import Language, LanguageSupport, SupportType, LanguageTitles
+from .language_model import Language, LanguageSupport, SupportType, LanguageTitle
 from .object_imagefield import ObjectWithImageField
 from .platform_model import Platform
 from .region_model import Region

@@ -79,32 +79,32 @@ class Regions(models.IntegerChoices):
 
 
 class Categories(models.IntegerChoices):
-    MAINGAME = 0, 'MG'
+    MAINGAME = 0, 'MainGame'
     DLC = 1, 'DLC'
-    EXPANSION = 2, 'EXP'
-    BUNDLE = 3, 'BD'
-    STANDALONE_EX = 4, 'SEXP'
-    MOD = 5, 'MOD'
-    EPISODE = 6, 'EP'
-    SEASON = 7, 'S'
-    REMAKE = 8, 'RM'
-    REMASTER = 9, 'RMA'
-    EXPANDED = 10, 'EG'
-    PORT = 11, 'P'
-    FORK = 12, 'F'
-    PACK = 13, 'PCK'
-    UPDATE = 14, 'U'
+    EXPANSION = 2, 'Expansion'
+    BUNDLE = 3, 'Bundle'
+    STANDALONE_EX = 4, 'StandaloneExpansion'
+    MOD = 5, 'Mod'
+    EPISODE = 6, 'Episode'
+    SEASON = 7, 'Season'
+    REMAKE = 8, 'Remake'
+    REMASTER = 9, 'Remaster'
+    EXPANDED = 10, 'ExpandedGame'
+    PORT = 11, 'Port'
+    FORK = 12, 'Fork'
+    PACK = 13, 'Pack'
+    UPDATE = 14, 'Update'
 
 
 class Status(models.IntegerChoices):
-    RELEASED = 0, 'F'
-    ALPHA = 2, 'A'
-    BETA = 3, 'B'
-    EARLY = 4, 'E'
-    OFFLINE = 5, 'O'
-    CANCELLED = 6, 'C'
-    RUMORED = 7, 'R'
-    DELISTED = 8, 'D'
+    RELEASED = 0, 'Released'
+    ALPHA = 2, 'Alpha'
+    BETA = 3, 'Beta'
+    EARLY = 4, 'EarlyAccess'
+    OFFLINE = 5, 'Offline'
+    CANCELLED = 6, 'Cancelled'
+    RUMORED = 7, 'Rumored'
+    DELISTED = 8, 'Delisted'
 
 
 class AgeRating(models.Model):
@@ -142,7 +142,7 @@ class Game(models.Model):
     genres: Any = models.ManyToManyField(Genres)
     themes: Any = models.ManyToManyField(Theme)
     category: str = models.TextField(
-        max_length=4,
+        max_length=50,
         choices=Game.Type.choices,
         default=Game.Type.MAINGAME
     )

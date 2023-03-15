@@ -18,32 +18,32 @@ class Game(CreatedUpdatedAt):
 
     # Type of the current game
     class Type(models.TextChoices):
-        MAINGAME = 'MG', _('Main Game')
+        MAINGAME = 'MainGame', _('Main Game')
         DLC = 'DLC', _('DLC Addon')
-        EXPANSION = 'EXP', _('Expansion')
-        BUNDLE = 'BD', _('Bundle')
-        STANDALONE_EX = 'SEXP', _('Standalone Expansion')
-        MOD = 'MOD', _('Mod')
-        EPISODE = 'EP', _('Episode')
-        SEASON = 'S', _('Season')
-        REMAKE = 'RM', _('Remake')
-        REMASTER = 'RMA', _('Remaster')
-        EXPANDED = 'EG', _('Expanded Game')
-        PORT = 'P', _('Port')
-        FORK = 'F', _('Fork')
-        PACK = 'PCK', _('Pack')
-        UPDATE = 'U', _('Update')
+        EXPANSION = 'Expansion', _('Expansion')
+        BUNDLE = 'Bundle', _('Bundle')
+        STANDALONE_EX = 'StandaloneExpansion', _('Standalone Expansion')
+        MOD = 'Mod', _('Mod')
+        EPISODE = 'Episode', _('Episode')
+        SEASON = 'Season', _('Season')
+        REMAKE = 'Remake', _('Remake')
+        REMASTER = 'Remaster', _('Remaster')
+        EXPANDED = 'ExpandedGame', _('Expanded Game')
+        PORT = 'Port', _('Port')
+        FORK = 'Fork', _('Fork')
+        PACK = 'Pack', _('Pack')
+        UPDATE = 'Update', _('Update')
 
     # Status of the current game
     class Status(models.TextChoices):
-        RELEASED = 'F', _('Released')
-        ALPHA = 'A', _('Alpha')
-        BETA = 'B', _('Beta')
-        EARLY = 'E', _('Early')
-        OFFLINE = 'O', _('Offline')
-        CANCELLED = 'C', _('Cancelled')
-        RUMORED = 'R', _('Rumored')
-        DELISTED = 'D', _('Delisted')
+        RELEASED = 'Released', _('Released')
+        ALPHA = 'Alpha', _('Alpha')
+        BETA = 'Beta', _('Beta')
+        EARLY = 'EarlyAccess', _('Early Access')
+        OFFLINE = 'Offline', _('Offline')
+        CANCELLED = 'Cancelled', _('Cancelled')
+        RUMORED = 'Rumored', _('Rumored')
+        DELISTED = 'Delisted', _('Delisted')
 
     title: str = models.CharField(max_length=100)
     player_perspectives: Any = models.ManyToManyField('api.PlayerPerspective')
@@ -76,11 +76,11 @@ class Game(CreatedUpdatedAt):
         null=True
     )
     type: str = models.CharField(
-        max_length=4,
+        max_length=50,
         choices=Type.choices,
     )
     status: str = models.CharField(
-        max_length=4,
+        max_length=50,
         choices=Status.choices,
     )
 

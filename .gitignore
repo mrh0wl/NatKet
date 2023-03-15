@@ -161,4 +161,5 @@ cython_debug/
 ex.json
 exs.json
 .gitignore
-rest-api.http
+*.http
+static

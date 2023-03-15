@@ -22,8 +22,7 @@ apps.populate(settings.INSTALLED_APPS)
 
 # This endpoint imports should be placed below the settings env declaration
 # Otherwise, django will throw a configure() settings error
-with contextlib.suppress(Exception):
-    from main.api_router import router as api_router
+from main.api_router import router as api_router
 # Get the Django WSGI application we are working with
 application = get_wsgi_application()
 

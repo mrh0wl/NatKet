@@ -13,7 +13,7 @@ class Platform(CreatedUpdatedAt):
         COMPUTER = 'COMPUTER', _('Computer')
         UNDEFINED = 'UNDEFINED', _('Undefined')
 
-    name: str = models.CharField(max_length=100)
+    name: str = models.CharField(max_length=100, unique=True)
     abbreviation: str = models.CharField(max_length=20, null=True)
     alternative_name: str = models.CharField(max_length=100, null=True)
     type: str = models.CharField(

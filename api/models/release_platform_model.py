@@ -28,7 +28,9 @@ class ReleasePlatform(models.Model):
     release_date: datetime = UCDateTimeField(
         auto_created=False,
         auto_now=False,
-        auto_now_add=False
+        auto_now_add=False,
+        null=True,
+        blank=True
     )
     region: str = models.CharField(
         max_length=3,

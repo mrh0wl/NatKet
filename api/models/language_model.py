@@ -1,16 +1,17 @@
 import contextlib
 from typing import Any, Optional
-import requests
 
+import requests
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from langcodes import Language as Lang
 
 from .creation_update_model import CreatedUpdatedAt
 
 
 class Language(CreatedUpdatedAt):
-    locale: str = models.CharField(max_length=10, null=True)
-    name: str = models.CharField(max_length=100, null=True)
+    locale: str = models.CharField(max_length=10, null=True, unique=True)
+    name: str = models.CharField(max_length=100, null=True, unique=True)
     native_name: str = models.CharField(max_length=100, null=True)
 
     def save(self, language: Optional[str] = None, *args, **kwargs):
@@ -37,17 +38,22 @@ class Language(CreatedUpdatedAt):
 
 
 class SupportType(CreatedUpdatedAt):
-    name: str = models.CharField(max_length=30, null=True)
+    class Enum(models.TextChoices):
+        AUDIO = 'Audio', _('Audio')
+        SUBTITLES = 'Subtitles', _('Subtitles')
+        INTERFACE = 'Interface', _('Interface')
+
+    name: str = models.CharField(max_length=30, choices=Enum.choices)
 
 
 class LanguageSupport(CreatedUpdatedAt):
-    cover: Any = models.ForeignKey("api.LocaleCover", on_delete=models.CASCADE, null=True)
+    cover: Any = models.OneToOneField("api.LocaleCover", on_delete=models.CASCADE, null=True, blank=True)
     game: Any = models.ForeignKey("api.Game", on_delete=models.CASCADE, related_name="language_supports")
     support_types: Any = models.ManyToManyField("api.SupportType")
     language: Any = models.ForeignKey("api.Language", on_delete=models.CASCADE, null=True)
 
 
-class LanguageTitles(CreatedUpdatedAt):
+class LanguageTitle(CreatedUpdatedAt):
     title: str = models.CharField(max_length=100, null=True)
     description: str = models.CharField(max_length=100, null=True)
     language_support: Any = models.ForeignKey("api.LanguageSupport", on_delete=models.CASCADE, related_name="language_titles")

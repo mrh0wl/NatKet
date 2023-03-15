@@ -8,6 +8,7 @@ from django.db import models
 from django.conf import settings
 
 from .creation_update_model import CreatedUpdatedAt
+from django.core.files.images import get_image_dimensions
 
 
 class ImageBase(CreatedUpdatedAt):
@@ -18,7 +19,7 @@ class ImageBase(CreatedUpdatedAt):
     url: str = models.URLField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        if self.height and self.width:
+        if 'http://127.0.0.1:8000/static/' not in self.url:
             self._get_image_from_url(url=self.url, filename=self.filename)
         else:
             self.filename = None
@@ -29,7 +30,7 @@ class ImageBase(CreatedUpdatedAt):
     def _get_image_from_url(self, url: Union[str, None], filename: str):
         pattern = r'(http|ftp|https)?:?//([\w_-]+(?:(?:.[\w_-]+)+)[\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])'
         reg_match = re.match(pattern, url)
-        schema = f'{reg_match[1]}://' if reg_match[1] else 'http://'
+        schema = f'{reg_match[1]}://' if reg_match[1] else 'https://'
         url_body = reg_match[2].replace('t_thumb', 't_cover_big')
         class_name = self.__class__.__name__.lower()
         self.filename = f'{filename}'
@@ -42,16 +43,19 @@ class ImageBase(CreatedUpdatedAt):
 
         if not exists(full_root):
             with open(full_root, 'wb') as handle:
-                response = requests.get(schema+url_body, stream=True)
+                response = requests.get(schema+url_body)
 
                 if not response.ok:
-                    print('Error getting:', filename)
+                    print('Error getting:', response.url, f'for {class_name} image ({response.status_code})')
+                    return
 
                 for block in response.iter_content(1024):
                     if not block:
                         break
 
                     handle.write(block)
+
+        self.width, self.height = get_image_dimensions(full_root)
 
 
 class LocaleCover(ImageBase):

@@ -13,6 +13,9 @@ class EndpointException(Exception):
 
         super(EndpointException, self).__init__(message)
 
+    def to_dict(self):
+        return self.__dict__
+
 
 class LimitException(EndpointException):
     limit_errors = {
@@ -39,17 +42,31 @@ class LimitException(EndpointException):
         else:
             return -1
 
-    def to_dict(self):
-        return self.__dict__
-
 
 class OffsetException(EndpointException):
     def __init__(self):
-        status_code, cause, message = (400, 'Offset too low', 'Offset can\'t be lower than zero')
+        status_code, cause, message = (400, 'Offset too low', 'Offset can\'t be lower than zero.')
         super().__init__(status_code=status_code, cause=cause, message=message)
 
 
 class SlugException(EndpointException):
     def __init__(self):
-        status_code, cause, message = (404, 'Game not found', 'Slug input not found in database')
+        status_code, cause, message = (404, 'Game not found', 'Slug input not found in database.')
         super().__init__(status_code=status_code, cause=cause, message=message)
+
+
+class FilterException(EndpointException):
+    def __init__(self, code: int = 1, key: str = '', model: str = ''):
+        type_errors = {
+            0: (400, 'Attribute not found', f'No attribute \'{key}\' in \'{model}\' schema.'),
+            1: (400, 'Invalid filter key', 'Filter key must be specified.'),
+            2: (400, 'Invalid filter key', 'Filter key can only be a single word.')
+        }
+        status_code, cause, message = type_errors[code]
+        super().__init__(status_code=status_code, cause=cause, message=message)
+
+
+class SortException(EndpointException):
+    def __init__(self, *args, **kwargs):
+        status_code, cause, message = (404, 'Field not found', f'Field input not found in: ({", ".join(self.args)}).'.strip())
+        super(EndpointException, self).__init__(status_code=status_code, cause=cause, message=message)
