@@ -9,7 +9,7 @@ from .object_imagefield import unique_slugify
 class Collection(CreatedUpdatedAt):
     name: str = models.CharField(max_length=150)
     games = models.ManyToManyField(Game, related_name='collection')
-    slug: str = models.SlugField(unique=True)
+    slug: str = models.SlugField(max_length=150, unique=True)
     url: str = models.URLField(max_length=250)
 
     def save(self, *args, **kwargs):

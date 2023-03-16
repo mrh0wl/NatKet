@@ -100,7 +100,7 @@ class Game(CreatedUpdatedAt):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = f'{slugify(self.title, allow_unicode=True)}{unique_slugify(self, self.slug)}'
+            self.slug = f'{unique_slugify(self, slugify(self.title, allow_unicode=True))}'
 
         super(Game, self).save(*args, **kwargs)
 
@@ -109,12 +109,3 @@ class Game(CreatedUpdatedAt):
 
     def __str__(self):
         return str(self.title)
-
-
-# class DLC(Game):
-#     """ Model for DLCs """
-
-#     class Meta:
-#         verbose_name = 'DLC'
-#         verbose_name_plural = 'DLCs'
-#         ordering = ['-id']

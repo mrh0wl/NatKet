@@ -21,7 +21,7 @@ class AgeRating(CreatedUpdatedAt):
     )
 
     class Meta:
-        ordering = ['-organization']
+        ordering = ['rating']
 
     def __str__(self):
         return f'{self.organization} {self.rating}'

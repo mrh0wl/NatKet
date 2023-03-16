@@ -6,9 +6,9 @@ from api.models.creation_update_model import CreatedUpdatedAt
 
 
 class AlternativeTitle(CreatedUpdatedAt):
-    title: str = models.CharField(max_length=100)
+    title: str = models.CharField(max_length=250)
     type: str = models.CharField(max_length=100)
-    game: Any = models.ForeignKey("api.Game", on_delete=models.CASCADE, related_name="alternative_titles")
+    game: Any = models.ForeignKey("api.Game", on_delete=models.CASCADE, related_name="alternative_titles", blank=True)
 
     def save(self, *args, **kwargs):
         self.type = self.type.split()[0].capitalize()

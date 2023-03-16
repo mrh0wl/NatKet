@@ -20,3 +20,8 @@ class Platform(CreatedUpdatedAt):
         max_length=100,
         choices=Type.choices,
     )
+
+    class Meta:
+        verbose_name = 'Platform'
+        verbose_name_plural = 'Platforms'
+        ordering = ['name']
