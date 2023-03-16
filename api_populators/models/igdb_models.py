@@ -117,7 +117,7 @@ class AgeRating(models.Model):
 
 class BaseTags(models.Model):
     name: str = models.TextField(max_length=100)
-    slug: str = models.SlugField(unique=True)
+    slug: str = models.SlugField(max_length=150, unique=True)
     url: str = models.URLField(max_length=250)
 
     class Meta:
@@ -137,8 +137,8 @@ class Theme(BaseTags):
 
 
 class Game(models.Model):
-    name: str = models.TextField(max_length=100, blank=True)
-    slug: str = models.SlugField(unique=True, blank=True)
+    name: str = models.TextField(max_length=100)
+    slug: str = models.SlugField(max_length=150, unique=True)
     genres: Any = models.ManyToManyField(Genres)
     themes: Any = models.ManyToManyField(Theme)
     category: str = models.TextField(
