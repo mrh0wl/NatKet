@@ -46,6 +46,7 @@ class GenreSchema(ModelSchema):
 class GameModeSchema(ModelSchema):
     class Config:
         model = GameMode
+        exclude = ['game_set']
 
 
 class PlayerPerspectiveSchema(ModelSchema):
@@ -189,32 +190,32 @@ class GameBase(ModelSchema):
     Base fields for game model.
     """
     id: int = Field(example=1)
-    player_perspectives: Optional[PlayerPerspectives]
-    thumbnails: Optional[Thumbnails]
-    alternative_titles: Optional[AlternativeTitles]
+    player_perspectives: Optional[PlayerPerspectives] = []
+    thumbnails: Optional[Thumbnails] = []
+    alternative_titles: Optional[AlternativeTitles] = Field(default=None)
     title: str
     slug: str
     created_at: datetime
     updated_at: datetime
-    first_release: Optional[datetime]
+    first_release: Optional[datetime] = None
     type: Game.Type
-    videos: Optional[Videos]
-    age_ratings: Optional[AgeRatings]
-    language_supports: Optional[LanguageSupports]
+    videos: Optional[Videos] = []
+    age_ratings: Optional[AgeRatings] = []
+    language_supports: Optional[LanguageSupports] = []
     cover: Optional[CoverSchema]
-    genres: Optional[Genres]
-    themes: Optional[Themes]
-    keywords: Optional[Keywords]
-    game_modes: Optional[GameModesList]
-    tags: Optional[Tags]
-    release_platforms: Optional[ReleasePlatforms]
-    dlcs: Optional[Any]
-    similar_games: Optional[Any]
-    expanded_games: Optional[Any]
-    standalone_expansions: Optional[Any]
-    expansions: Optional[Any]
-    remakes: Optional[Any]
-    remasters: Optional[Any]
+    genres: Optional[Genres] = []
+    themes: Optional[Themes] = []
+    keywords: Optional[Keywords] = []
+    game_modes: Optional[GameModesList] = []
+    tags: Optional[Tags] = []
+    release_platforms: Optional[ReleasePlatforms] = []
+    dlcs: Optional[Any] = []
+    similar_games: Optional[Any] = []
+    expanded_games: Optional[Any] = []
+    standalone_expansions: Optional[Any] = []
+    expansions: Optional[Any] = []
+    remakes: Optional[Any] = []
+    remasters: Optional[Any] = []
 
     class Config:
         model = Game
@@ -225,6 +226,7 @@ class GameBase(ModelSchema):
 class LinksResponse(BaseModel):
     prev: Optional[str] = None
     next: Optional[str] = None
+    first: Optional[str] = None
     last: Optional[str] = None
 
 
@@ -232,36 +234,46 @@ class MetaResponse(BaseModel):
     total_count: Optional[int] = None
     offset: Optional[int] = None
     limit: Optional[int] = None
-    filter: Optional[Dict[str, Any]] = None
+    filters: Optional[List[Dict]] = None
 
 
-class PaginatedResponse(BaseModel):
-    data: List[Optional[dict]]
+class ResultResponse(BaseModel):
+    data: List[dict]
     links: LinksResponse = LinksResponse()
     meta: MetaResponse = MetaResponse()
 
-    def __init__(self, data: List[dict], route_name: str, offset: int, limit: int, max_count: int, **filters):
+    def __init__(self, raw_filters: str, data: List[dict], route_name: str, offset: int, limit: int, max_count: int, **filters):
         super().__init__(data=data)
         base_url = f"http://127.0.0.1:8000/api/v1/{route_name}"
 
-        if offset - limit >= 0:
-            self.links.prev = f"{base_url}{self.query_params(offset - limit, limit)}"
-        if offset + limit < max_count:
-            self.links.next = f"{base_url}{self.query_params(offset + limit, limit)}"
+        fixed_filters = [{'field': k.split('__')[0], 'type': k.split(
+            '__')[1].removeprefix('i') if k.split('__')[1] != 'isnull' else k.split('__')[1], 'query': v} for k, v in filters.items()]
         last_offset = max_count - (max_count % limit)
-        if offset != last_offset and last_offset >= 0:
-            self.links.last = f"{base_url}{self.query_params(last_offset, limit)}"
+        self.links.last = f"{base_url}?{raw_filters}{self.query_params(last_offset, limit)}"
+        self.links.first = f"{base_url}?{raw_filters}{self.query_params(0, limit)}"
+        if offset - limit >= 0:
+            self.links.prev = f"{base_url}?{raw_filters}{self.query_params(offset - limit, limit)}"
+        if offset + limit < max_count:
+            self.links.next = f"{base_url}?{raw_filters}{self.query_params(offset + limit, limit)}"
 
-        fixed_filters = [{'field': k.split('__')[0], 'type': k.split('__')[1].removeprefix('i'), 'query': v} for k, v in filters.items()]
         self.meta = MetaResponse(
             total_count=max_count,
             offset=offset,
             limit=limit,
-            filter=fixed_filters or None,
+            filters=fixed_filters or None,
         )
 
     def query_params(self, offset: int, limit: int) -> str:
-        return f"?offset={offset}&limit={limit}"
+        # print('&filter'+''.join([f'[{item["field"]}]={item["query"]}' for item in filters]))
+        return f"offset={offset}&limit={limit}"
+
+
+class PaginatedResponse(BaseModel):
+    message: str
+    result: ResultResponse
+
+    def __init__(self, raw_filters: str, message: str, data: List[dict], route_name: str, offset: int, limit: int, max_count: int, **filters):
+        super().__init__(message=message, result=ResultResponse(raw_filters, data, route_name, offset, limit, max_count, **filters))
 
 
 class CreateGame(GameBase):
