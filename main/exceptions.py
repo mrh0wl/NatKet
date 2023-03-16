@@ -57,10 +57,12 @@ class SlugException(EndpointException):
 
 class FilterException(EndpointException):
     def __init__(self, code: int = 1, key: str = '', model: str = ''):
+        key_length = len(key.split(",")) - 2
+        add_or_remove_text = f'Remove {key_length} field{"s" if key_length > 1 else ""}'
         type_errors = {
-            0: (400, 'Attribute not found', f'No attribute \'{key}\' in \'{model}\' schema.'),
-            1: (400, 'Invalid filter key', 'Filter key must be specified.'),
-            2: (400, 'Invalid filter key', 'Filter key can only be a single word.')
+            0: (400, 'Attribute not found', f'No attribute \'{key}\' in {model} Schema.'),
+            1: (400, 'Invalid filter field', 'The filter field must be specified between square brackets \'[]\'. Add at least one filter field to proceed.'),
+            2: (400, 'Invalid filter field', f'Filter field can only be a max of two words separated by commas \',\' or pipes \'|\'. {add_or_remove_text} between: {" or".join(key.replace(",", ", ").rsplit(",", 1))} in \'filters\' param')
         }
         status_code, cause, message = type_errors[code]
         super().__init__(status_code=status_code, cause=cause, message=message)
