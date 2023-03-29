@@ -31,7 +31,6 @@ class LanguageRouter(BaseRouter):
     model = Language
     schema = LanguageSchema
     path_slug = r"/{locale:str}"
-    name_slug = "Get Language by locale"
 
 
 class PlayerPerspectiveRouter(BaseRouter):

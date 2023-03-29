@@ -1,17 +1,91 @@
 import re
 from http.client import responses
+from operator import attrgetter
 from typing import Any, Dict, List, Optional
 
 from django.core.exceptions import FieldError
 from django.utils.html import escape
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from api.schemas import ExceptionSchema, PaginatedResponse
-from main.exceptions import (FilterException, LimitException, OffsetException,
-                             SlugException, SortException)
+from api.schemas import PaginatedResponse, ResponseSchema
+from api.schemas.exception_schema import BadRequestSchema, ForbiddenSchema, NotFoundSchema, ValidationErrorSchema
+from main.utils.exceptions import FilterException, LimitException, OffsetException, SlugException, SortException
 from utils import String
+
+example_field = "?filters[field]"
+filters_examples = {
+    "normal": {
+        "summary": "Filter exact words. (<QUERY>)",
+        "value": {
+            example_field: "query"
+        },
+    },
+    "contains": {
+        "summary": "Filter words that are in. (*<QUERY>*)",
+        "value": {
+            example_field: "*query*"
+        },
+    },
+    "endswith": {
+        "summary": "Filter words that end with. (*<QUERY>)",
+        "value": {
+            example_field: "*query"
+        },
+    },
+    "startswith": {
+        "summary": "Filter words that start with. (<QUERY>*)",
+        "value": {
+            example_field: "query*"
+        },
+    },
+    "not-null": {
+        "summary": "Filter fields that are not null. (!!<FIELD>)",
+        "value": {
+            "?filters[!!field]": ""
+        },
+    },
+    "not-null-search": {
+        "summary": "Filter field that is not null and search query. (!<FIELD>)",
+        "value": {
+            "?filters[!field]": "*fantasy*"
+        },
+    },
+    "combined": {
+        "summary": "Filter not null field and search query for the other one.",
+        "value": {
+            "?filters[!!field1,field2]": "*query*"
+        },
+    },
+}
+
+
+class RootQueryParams:
+    def __init__(
+        self,
+        filters: str = Query(
+            default=None,
+            description="Allows advanced filtering of the data adding extra logic in request.",
+            examples=filters_examples
+        ),
+        offset: int = Query(
+            default=0,
+            description="Position in the dataset of a particular record.",
+            example={"?offset": 15}
+        ),
+        limit: int = Query(
+            default=10,
+            description="Amount of total data that can access per request."
+        ),
+        sort: Optional[str] = Query(
+            default=None,
+            description="Allows to order the results by field, in ascending or descending order."),
+    ):
+        self.filters = filters
+        self.offset = offset
+        self.limit = limit
+        self.sort = sort
 
 
 class BaseRouter(APIRouter):
@@ -20,32 +94,36 @@ class BaseRouter(APIRouter):
     path_slug = r"/{slug:str}"
     description_root = None
     description_slug = None
-    exception_responses = {
-        400: {'model': ExceptionSchema},
-        403: {'model': ExceptionSchema},
-        404: {'model': ExceptionSchema},
-        # 422: {'model': ExceptionSchema}
+    custom_responses = {
+        400: {'model': BadRequestSchema},
+        403: {'model': ForbiddenSchema},
+        404: {'model': NotFoundSchema},
+        422: {'model': ValidationErrorSchema, 'description': 'Validation Error'}
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.redirect_slashes = True
-        self.responses = self.exception_responses
+        self.responses = self.custom_responses
         self.model_name = String(self.model.__name__).split_camelcase
+        self.prefix = f'/{"-".join(self.model_name.lower().strip().split())}s'
+        self.param_name = re.search(r"{(\w+):?.*}", self.path_slug)[1]
+        self.name_root = self.name_slug or f'Get All {self.model_name}s'
+        self.name_slug = self.name_slug or f'Get {self.model_name}'
+        self.description_root = self.description_root or f'Endpoint to get all {self.model_name}s based on offset and limit values.'
+        self.description_slug = self.description_slug or f'Endpoint to get a specific {self.model_name}.'
+        self.tags = [f'{self.model_name}s']
 
         self._add_routes()
 
     def _add_routes(self):
-        default_description_root = f'Endpoint to get all {self.model_name}s based on offset and limit values.'
-        default_description_slug = f'Endpoint to get a specific {self.model_name}.'
-        description_root = self.description_root or default_description_root
-        description_slug = self.description_slug or default_description_slug
-
+        """Add routes"""
         self.add_api_route(
             path="",
+            status_code=200,
             endpoint=self.get_items,
             name=self.name_root or f'Get all {self.model_name}s',
-            description=description_root,
+            description=self.description_root,
             response_model=PaginatedResponse,
             response_model_exclude_none=True,
             methods=["GET"],
@@ -53,15 +131,27 @@ class BaseRouter(APIRouter):
 
         self.add_api_route(
             path=self.path_slug,
+            status_code=200,
             endpoint=self.get_specific_item,
             name=self.name_slug or f'Get {self.model_name}',
-            description=description_slug,
+            description=self.description_slug,
             response_model=PaginatedResponse,
             response_model_exclude_none=True,
-            methods=["GET"]
+            methods=["GET"],
+            openapi_extra={
+                'parameters': [
+                    {
+                        "required": True,
+                        'schema': {'title': self.param_name.capitalize(), 'type': 'string'},
+                        'name': self.param_name,
+                        'in': 'path'
+                    }
+                ]
+            },
         )
 
-    def get_items(self, request: Request, offset: int = 0, limit: int = 10, sort: Optional[str] = None) -> Any:
+    def get_items(self, request: Request, params: RootQueryParams = Depends()) -> Any:
+        sort, offset, limit = attrgetter('sort', 'offset', 'limit')(params)
         filters = {}
         q_params = request.query_params._dict
         filter_re = re.compile(r'^filters?\[(.*)\]$')
@@ -82,9 +172,10 @@ class BaseRouter(APIRouter):
             query = ordered_and_filtered[offset: offset + limit]
             count = ordered_and_filtered.count()
             raw_filters = f'filters[{filter_items[0][0]}]={filter_items[0][1]}&' if filter_items else ''
-            response = PaginatedResponse(raw_filters=raw_filters, message=responses[200], data=self.schema.from_django(query, many=True),
-                                         route_name=f'{self.model_name.lower()}s', offset=offset, limit=limit, max_count=count, **filters)
-            return JSONResponse(content=jsonable_encoder(response.dict(exclude_none=True)))
+            result = ResponseSchema(raw_filters=raw_filters, data=self.schema.from_django(query, many=True),
+                                    route_name=f'{self.model_name.lower()}s', offset=offset, limit=limit, max_count=count, **filters)
+            response = PaginatedResponse(message=responses[200], result=result)
+            return JSONResponse(content=jsonable_encoder(response.dict()))
         except FieldError as e:
             self.handle_sort_exception(e)
 
@@ -150,11 +241,14 @@ class BaseRouter(APIRouter):
     def handle_sort_exception(self, e: FieldError) -> None:
         raise SortException(e.args[0].split('Choices are:')[1])
 
-    def get_specific_item(self, slug: str) -> Any:
-        name = re.search(r"{(\w+):?.*}", self.path_slug)
-        filter_query = {name: slug}
+    def get_specific_item(self, request: Request) -> Any:
+        param_value = request['path_params'][self.param_name]
+        filter_query = {self.param_name: param_value}
         if self.model.objects.filter(**filter_query).exists():
             query = self.model.objects.get(**filter_query)
-            return self.schema.from_django(query)
+            result = ResponseSchema(raw_filters=None, data=self.schema.from_django(query),
+                                    route_name=f'{self.model_name.lower()}s', offset=None, limit=None, max_count=None)
+            response = PaginatedResponse(message=responses[200], result=result)
+            return JSONResponse(content=jsonable_encoder(response.dict(exclude_none=True)))
         else:
             raise SlugException()

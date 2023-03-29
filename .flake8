@@ -4,4 +4,6 @@ max-line-length = 130
 exclude =
     .git,
     __pycache__,
-	__init__.py
+	__init__.py,
+per-file-ignores =
+	main/asgi.py:E402

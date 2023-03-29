@@ -9,10 +9,12 @@ https://docs.djangoproject.com/en/4.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
+
 import os
 from pathlib import Path
 
 import environ
+import yaml
 
 # Initialise environment variables
 env = environ.Env(DEBUG=(bool, False))
@@ -158,8 +160,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 API_V1_STR: str = "/api/v1"
 WSGI_APP_URL: str = "/"
-PROJECT_NAME = "NatKet Video Games Database API"
+PROJECT_NAME = "NatKet Database API"
 PROJECT_VERSION = "1.0.0"
-PROJECT_DESCRIPTION = "One of the principles behind NatKet.com is accessibility of data. We wish to share the data with anyone who wants to build cool video game oriented websites, apps and services.\n\
-            \nThis means that you are not only contributing to the value of NatKet but to thousands of other projects as well. We are looking forward to see what exciting game related projects you come up with. Happy coding!\n\
-            \nFor a high level overview of our juicy data, check out the endpoints section."
+yaml_file = os.path.join(BASE_DIR, 'utils/')
+with open(f"{yaml_file}project_info.yaml", "r") as f:
+    loaded = yaml.safe_load(f)
+    PROJECT_DESCRIPTION = loaded['description']

@@ -1,0 +1,33 @@
+description: |
+  One of the principles behind NatKet.com is accessibility of data.
+  We wish to share the data with anyone who wants to build cool
+  video game oriented websites, apps and services.
+
+  This means that you are not only contributing to the value of NatKet
+  but to thousands of other projects as well. We are looking forward
+  to see what exciting game related projects you come up with. Happy coding!
+
+  For a high level overview of our juicy data,
+  check out the endpoints section.
+
+  # OpenAPI Specification
+  This API is documented in **OpenAPI format** and is based on
+  [Petstore sample](http://petstore.swagger.io/) provided by [swagger.io](http://swagger.io) team.
+  It was **extended** to illustrate features of [generator-openapi-repo](https://github.com/Rebilly/generator-openapi-repo)
+  tool and [ReDoc](https://github.com/Redocly/redoc) documentation. In addition to standard
+  OpenAPI syntax we use a few [vendor extensions](https://github.com/Redocly/redoc/blob/main/docs/redoc-vendor-extensions.md).
+
+  # Cross-Origin Resource Sharing
+  This API features Cross-Origin Resource Sharing (CORS) implemented in compliance with  [W3C spec](https://www.w3.org/TR/cors/).
+  And that allows cross-domain communication from the browser.
+  All responses have a wildcard same-origin which makes them completely public and accessible to everyone, including any code on any site.
+
+  # Authentication
+
+  Petstore offers two forms of authentication:
+    - API Key
+    - OAuth2
+  OAuth2 - an open protocol to allow secure authorization in a simple
+  and standard method from web, mobile and desktop applications.
+
+  <SecurityDefinitions />
